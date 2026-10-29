@@ -105,6 +105,20 @@ the `X-CSRF-Token` header.
 
 `"repeat": null` (or omitted) means one-time. Tasks take the time from `due_at`.
 
+## Task start and alert
+
+```jsonc
+{
+  "title": "Write report",
+  "start_at": "2026-11-02T08:00:00+07:00",   // optional, not after due_at
+  "due_at":   "2026-11-02T10:00:00+07:00",
+  "alert": "15m"                             // "" | start | due | 5m | 15m | 30m | 1h | 2h | 1d
+}
+```
+
+Responses include `next_alert_at` while an alert is scheduled. Alerts are delivered as
+occurrences, so `/occurrences/{id}/done`, `/skip` and `/snooze` work on them.
+
 ## Examples
 
 ```bash

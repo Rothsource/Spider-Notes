@@ -106,20 +106,20 @@ func (d *DB) TagCounts(ctx context.Context, kind string) ([]model.TagCount, erro
 
 // ---- tasks ----
 
-const taskCols = `t.id, t.title, t.description_md, t.due_at, t.priority, t.status, t.repeat_rule, t.repeat_start_at, t.completed_at, t.created_at, t.updated_at, t.deleted_at`
+const taskCols = `t.id, t.title, t.description_md, t.start_at, t.due_at, t.alert, t.next_alert_at, t.priority, t.status, t.repeat_rule, t.repeat_start_at, t.completed_at, t.created_at, t.updated_at, t.deleted_at`
 
 func scanTask(sc interface{ Scan(...any) error }) (model.Task, error) {
 	var t model.Task
-	err := sc.Scan(&t.ID, &t.Title, &t.DescriptionMD, tsp(&t.DueAt), &t.Priority, &t.Status, &t.RepeatRule,
+	err := sc.Scan(&t.ID, &t.Title, &t.DescriptionMD, tsp(&t.StartAt), tsp(&t.DueAt), &t.Alert, tsp(&t.NextAlertAt), &t.Priority, &t.Status, &t.RepeatRule,
 		tsp(&t.RepeatStartAt), tsp(&t.CompletedAt), ts(&t.CreatedAt), ts(&t.UpdatedAt), tsp(&t.DeletedAt))
 	return t, err
 }
 
 // CreateTask implements store.Tasks.
 func (d *DB) CreateTask(ctx context.Context, t *model.Task) error {
-	res, err := d.q.ExecContext(ctx, `INSERT INTO tasks(title, description_md, due_at, priority, status, repeat_rule, repeat_start_at, completed_at, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?)`,
-		t.Title, t.DescriptionMD, fpt(t.DueAt), t.Priority, t.Status, t.RepeatRule, fpt(t.RepeatStartAt), fpt(t.CompletedAt), ft(t.CreatedAt), ft(t.UpdatedAt))
+	res, err := d.q.ExecContext(ctx, `INSERT INTO tasks(title, description_md, start_at, due_at, alert, next_alert_at, priority, status, repeat_rule, repeat_start_at, completed_at, created_at, updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		t.Title, t.DescriptionMD, fpt(t.StartAt), fpt(t.DueAt), t.Alert, fpt(t.NextAlertAt), t.Priority, t.Status, t.RepeatRule, fpt(t.RepeatStartAt), fpt(t.CompletedAt), ft(t.CreatedAt), ft(t.UpdatedAt))
 	if err != nil {
 		return err
 	}
@@ -129,9 +129,9 @@ func (d *DB) CreateTask(ctx context.Context, t *model.Task) error {
 
 // UpdateTask implements store.Tasks.
 func (d *DB) UpdateTask(ctx context.Context, t *model.Task) error {
-	return checkAffected(d.q.ExecContext(ctx, `UPDATE tasks SET title=?, description_md=?, due_at=?, priority=?, status=?, repeat_rule=?, repeat_start_at=?, completed_at=?, updated_at=?
+	return checkAffected(d.q.ExecContext(ctx, `UPDATE tasks SET title=?, description_md=?, start_at=?, due_at=?, alert=?, next_alert_at=?, priority=?, status=?, repeat_rule=?, repeat_start_at=?, completed_at=?, updated_at=?
 		WHERE id=? AND deleted_at IS NULL`,
-		t.Title, t.DescriptionMD, fpt(t.DueAt), t.Priority, t.Status, t.RepeatRule, fpt(t.RepeatStartAt), fpt(t.CompletedAt), ft(t.UpdatedAt), t.ID))
+		t.Title, t.DescriptionMD, fpt(t.StartAt), fpt(t.DueAt), t.Alert, fpt(t.NextAlertAt), t.Priority, t.Status, t.RepeatRule, fpt(t.RepeatStartAt), fpt(t.CompletedAt), ft(t.UpdatedAt), t.ID))
 }
 
 // GetTask implements store.Tasks. Soft-deleted tasks are returned too (for history).
@@ -227,6 +227,11 @@ func (d *DB) ListTasks(ctx context.Context, f model.TaskFilter) ([]model.Task, e
 // ListTasksDue implements store.Tasks.
 func (d *DB) ListTasksDue(ctx context.Context, before time.Time) ([]model.Task, error) {
 	return d.queryTasks(ctx, `SELECT `+taskCols+` FROM tasks t WHERE t.deleted_at IS NULL AND t.status = 'pending' AND t.due_at IS NOT NULL AND t.due_at <= ? ORDER BY t.due_at`, ft(before))
+}
+
+// ListTaskAlertsDue implements store.Tasks.
+func (d *DB) ListTaskAlertsDue(ctx context.Context, now time.Time) ([]model.Task, error) {
+	return d.queryTasks(ctx, `SELECT `+taskCols+` FROM tasks t WHERE t.deleted_at IS NULL AND t.status = 'pending' AND t.next_alert_at IS NOT NULL AND t.next_alert_at <= ? ORDER BY t.next_alert_at`, ft(now))
 }
 
 // SoftDeleteTask implements store.Tasks.

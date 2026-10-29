@@ -30,6 +30,17 @@ Optional: set the bot's picture with `/setuserpic` in @BotFather using
 ```
 
 - The task line appears for reminders attached to a task.
+- **Task alerts** (the *Alert* field of a task) look like this:
+
+  ```
+  🔔 📋 Write report
+  ▶️ Start Sun 01 Mar 08:00
+  🕒 Due Sun 01 Mar 10:00
+
+  [✅ Done] [⏰ 10m] [⏰ 1h] [⏭ Skip]
+  ```
+
+  Done completes the task; Skip appears only for repeating tasks.
 - The counter appears from the second send onwards (nag mode, snooze).
 - **Skip** appears only for repeating reminders.
 

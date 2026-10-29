@@ -142,9 +142,12 @@ func TestLoginAndPagesRender(t *testing.T) {
 	csrf := a.login()
 
 	// Create data through the web forms.
-	if code, body, _ := a.postForm("/tasks", url.Values{"csrf_token": {csrf}, "title": {"Gym"}, "due": {"2030-01-07T18:00"},
-		"priority": {"high"}, "tags": {"health"}, "repeat_freq": {"weekly"}, "repeat_weekdays": {"1", "3"}}); code != http.StatusSeeOther {
+	if code, body, _ := a.postForm("/tasks", url.Values{"csrf_token": {csrf}, "title": {"Gym"}, "start": {"2030-01-07T17:00"}, "due": {"2030-01-07T18:00"},
+		"alert": {"15m"}, "priority": {"high"}, "tags": {"health"}, "repeat_freq": {"weekly"}, "repeat_weekdays": {"1", "3"}}); code != http.StatusSeeOther {
 		t.Fatalf("create task: %d %s", code, body)
+	}
+	if code, body, _ := a.postForm("/tasks", url.Values{"csrf_token": {csrf}, "title": {"x"}, "alert": {"start"}, "due": {"2030-01-07T18:00"}}); code != http.StatusBadRequest || !strings.Contains(body, "needs a start time") {
+		t.Fatalf("alert validation should re-render the form: %d", code)
 	}
 	if code, body, _ := a.postForm("/reminders", url.Values{"csrf_token": {csrf}, "message": {"You should not eat this this morning"},
 		"type": {"repeating"}, "freq": {"daily"}, "time": {"07:30"}, "start_date": {"2030-01-01"}, "nag": {"on"}, "nag_interval": {"10"},
@@ -177,6 +180,9 @@ func TestLoginAndPagesRender(t *testing.T) {
 	_, cal := a.get("/calendar?view=month&date=2030-01-07")
 	if strings.Count(cal, "Gym") < 4 {
 		t.Fatal("repeating task should appear on each occurrence day in the month view")
+	}
+	if _, form := a.get("/tasks/1"); !strings.Contains(form, `value="2030-01-07T17:00"`) || !strings.Contains(form, `value="15m" selected`) {
+		t.Fatal("task form should show the saved start and alert")
 	}
 	_, memos := a.get("/memos")
 	if !strings.Contains(memos, `data-cb="0"`) || !strings.Contains(memos, "#health") {

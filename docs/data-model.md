@@ -51,7 +51,7 @@ erDiagram
 
 | Table | Key columns |
 |---|---|
-| `tasks` | title, description_md, due_at, priority (`low`/`normal`/`high`), status (`pending`/`done`), repeat_rule (RRULE), repeat_start_at, completed_at, deleted_at |
+| `tasks` | title, description_md, start_at, due_at, alert (`''`/`start`/`due`/`5m`…`1d`), next_alert_at, priority (`low`/`normal`/`high`), status (`pending`/`done`), repeat_rule (RRULE), repeat_start_at, completed_at, deleted_at |
 | `reminders` | task_id (nullable), message_md, schedule_type (`one_time`/`repeating`), fire_at (time or series start), repeat_rule, active_window, timezone, nag_enabled, nag_interval_min, quiet_hours_override (`''`/`off`/`HH:MM-HH:MM`), ignore_quiet_hours, enabled, next_fire_at, last_sent_at, fire_count, deleted_at |
 | `occurrences` | reminder_id / task_id, scheduled_for, status (`pending`/`sent`/`done`/`snoozed`/`skipped`/`missed`), sent_count, snooze_count, snoozed_until, next_send_at, last_sent_at, done_at, action_source (`web`/`telegram`/`api`/`system`), telegram_chat_id, telegram_message_id |
 

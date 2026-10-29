@@ -78,6 +78,8 @@ type Tasks interface {
 	SoftDeleteTask(ctx context.Context, id int64, at time.Time) error
 	// ListTasksDue returns pending, non-deleted tasks with due_at <= before.
 	ListTasksDue(ctx context.Context, before time.Time) ([]model.Task, error)
+	// ListTaskAlertsDue returns pending, non-deleted tasks with next_alert_at <= now.
+	ListTaskAlertsDue(ctx context.Context, now time.Time) ([]model.Task, error)
 }
 
 // Reminders persists reminders.

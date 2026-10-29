@@ -15,11 +15,47 @@ import (
 type TaskInput struct {
 	Title       string       `json:"title"`
 	Description string       `json:"description_md"`
+	StartAt     *time.Time   `json:"start_at"`
 	DueAt       *time.Time   `json:"due_at"`
+	Alert       string       `json:"alert"` // see TaskAlerts
 	Priority    string       `json:"priority"`
 	Tags        []string     `json:"tags"`
 	Repeat      *RepeatInput `json:"repeat"`
 }
+
+// Task alert values: when the built-in Telegram notification fires.
+const (
+	AlertNone  = ""
+	AlertStart = "start"
+	AlertDue   = "due"
+)
+
+// TaskAlertOption is one choice of the task alert picker.
+type TaskAlertOption struct {
+	Value, Label string
+}
+
+// TaskAlerts lists the alert choices in display order.
+var TaskAlerts = []TaskAlertOption{
+	{AlertNone, "None"},
+	{AlertStart, "At start time"},
+	{AlertDue, "At due time"},
+	{"5m", "5 minutes before"},
+	{"15m", "15 minutes before"},
+	{"30m", "30 minutes before"},
+	{"1h", "1 hour before"},
+	{"2h", "2 hours before"},
+	{"1d", "1 day before"},
+}
+
+// alertOffsets maps "before due" alerts to their lead time.
+var alertOffsets = map[string]time.Duration{
+	AlertDue: 0, "5m": 5 * time.Minute, "15m": 15 * time.Minute, "30m": 30 * time.Minute,
+	"1h": time.Hour, "2h": 2 * time.Hour, "1d": 24 * time.Hour,
+}
+
+// staleAlert is how late an alert may still be sent after its instance was due (e.g. after downtime).
+const staleAlert = time.Hour
 
 func (s *Service) buildTask(in TaskInput, t *model.Task) error {
 	var err error
@@ -41,7 +77,23 @@ func (s *Service) buildTask(in TaskInput, t *model.Task) error {
 		return model.Invalid("Priority must be low, normal or high")
 	}
 	t.Tags = markdown.NormalizeTags(in.Tags)
+	if in.StartAt != nil && in.DueAt != nil && in.StartAt.After(*in.DueAt) {
+		return model.Invalid("Start must be before the due time")
+	}
+	if in.Alert != AlertNone {
+		if _, ok := alertOffsets[in.Alert]; !ok && in.Alert != AlertStart {
+			return model.Invalid("Unknown alert option")
+		}
+		if in.DueAt == nil {
+			return model.Invalid("An alert needs a due date and time")
+		}
+		if in.Alert == AlertStart && in.StartAt == nil {
+			return model.Invalid("“At start time” needs a start time")
+		}
+	}
 	oldRule, oldStart := t.RepeatRule, t.RepeatStartAt
+	alertChanged := t.ID == 0 || t.Alert != in.Alert || !sameTime(t.StartAt, in.StartAt) || !sameTime(t.DueAt, in.DueAt)
+	t.StartAt, t.Alert = in.StartAt, in.Alert
 	t.DueAt = in.DueAt
 	t.RepeatRule = ""
 	t.RepeatStartAt = nil
@@ -71,6 +123,112 @@ func (s *Service) buildTask(in TaskInput, t *model.Task) error {
 		} else {
 			t.RepeatStartAt = ptr(s.StartOfDay(due))
 		}
+	}
+	if alertChanged || t.RepeatRule != oldRule {
+		t.NextAlertAt = s.nextAlert(t, s.now().UTC())
+	}
+	return nil
+}
+
+func sameTime(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.Equal(*b)
+}
+
+// alertLead is how long before an instance's due time the alert fires.
+func alertLead(t *model.Task) (time.Duration, bool) {
+	if t.Alert == AlertNone || t.DueAt == nil {
+		return 0, false
+	}
+	if t.Alert == AlertStart {
+		if t.StartAt == nil {
+			return 0, false
+		}
+		return t.DueAt.Sub(*t.StartAt), true
+	}
+	d, ok := alertOffsets[t.Alert]
+	return d, ok
+}
+
+// nextAlert returns the alert time for the first instance due after `after`
+// (the current due time, then later repeats), or nil when there is none.
+// The result may lie in the past while the instance is still ahead: the alert then fires at once.
+func (s *Service) nextAlert(t *model.Task, after time.Time) *time.Time {
+	lead, ok := alertLead(t)
+	if !ok || t.Status != model.TaskPending {
+		return nil
+	}
+	due := *t.DueAt
+	if !due.After(after) {
+		if t.RepeatRule == "" || t.RepeatStartAt == nil {
+			return nil
+		}
+		rule, err := schedule.Parse(t.RepeatRule)
+		if err != nil {
+			return nil
+		}
+		for i := 0; i < 100_000 && !due.IsZero() && !due.After(after); i++ {
+			due = rule.Next(*t.RepeatStartAt, due, s.loc)
+		}
+		if due.IsZero() || !due.After(after) {
+			return nil
+		}
+	}
+	return ptr(due.Add(-lead).UTC())
+}
+
+// moveDue sets a new due time; the start time keeps its distance to the due time.
+func moveDue(t *model.Task, next time.Time) {
+	if t.StartAt != nil && t.DueAt != nil {
+		t.StartAt = ptr(t.StartAt.Add(next.Sub(*t.DueAt)).UTC())
+	}
+	t.DueAt = ptr(next.UTC())
+}
+
+// processTaskAlerts queues the Telegram alert of tasks whose alert time has come.
+// The alert is the occurrence row of the instance's due time with next_send_at set,
+// so it is delivered, snoozed and acted on like a reminder.
+func (s *Service) processTaskAlerts(ctx context.Context, now time.Time) error {
+	tasks, err := s.st.ListTaskAlertsDue(ctx, now)
+	if err != nil {
+		return err
+	}
+	for i := range tasks {
+		id := tasks[i].ID
+		err := s.st.InTx(ctx, func(tx store.Store) error {
+			t, err := liveTask(ctx, tx, id)
+			if err != nil {
+				return err
+			}
+			if t.Status != model.TaskPending || t.NextAlertAt == nil || t.NextAlertAt.After(now) {
+				return nil // changed concurrently
+			}
+			lead, ok := alertLead(t)
+			if !ok {
+				t.NextAlertAt = nil
+				return tx.UpdateTask(ctx, t)
+			}
+			due := t.NextAlertAt.Add(lead) // the instance this alert belongs to
+			if now.Sub(due) <= staleAlert {
+				o, err := tx.FindOccurrence(ctx, 0, t.ID, due)
+				switch {
+				case errors.Is(err, model.ErrNotFound):
+					_, err = tx.InsertOccurrence(ctx, &model.Occurrence{TaskID: &t.ID, ScheduledFor: due, Status: model.OccPending,
+						NextSendAt: &now, CreatedAt: now, UpdatedAt: now})
+				case err == nil && o.IsOpen() && o.SentCount == 0 && o.NextSendAt == nil:
+					o.NextSendAt, o.UpdatedAt = &now, now
+					err = tx.UpdateOccurrence(ctx, o)
+				}
+				if err != nil {
+					return err
+				}
+			}
+			t.NextAlertAt = s.nextAlert(t, due)
+			return tx.UpdateTask(ctx, t)
+		})
+		logErr("task alert", err, "task", id)
 	}
 	return nil
 }
@@ -227,6 +385,9 @@ func (s *Service) finishTaskTx(ctx context.Context, tx store.Store, id int64, st
 	} else if err := tx.UpdateOccurrence(ctx, o); err != nil {
 		return nil, err
 	}
+	if o.TelegramMessageID != 0 {
+		s.notify().Finalize(o.TelegramChatID, o.TelegramMessageID, s.finalText(ctx, tx, o))
+	}
 
 	if t.RepeatRule != "" && t.DueAt != nil && t.RepeatStartAt != nil {
 		rule, err := schedule.Parse(t.RepeatRule)
@@ -237,7 +398,7 @@ func (s *Service) finishTaskTx(ctx context.Context, tx store.Store, id int64, st
 		if next.IsZero() {
 			t.Status = model.TaskDone // series finished
 		} else {
-			t.DueAt = ptr(next.UTC())
+			moveDue(t, next)
 		}
 		if status == model.OccDone {
 			t.CompletedAt = &now
@@ -246,6 +407,7 @@ func (s *Service) finishTaskTx(ctx context.Context, tx store.Store, id int64, st
 		t.Status = model.TaskDone
 		t.CompletedAt = &now
 	}
+	t.NextAlertAt = s.nextAlert(t, now)
 	t.UpdatedAt = now
 	if err := tx.UpdateTask(ctx, t); err != nil {
 		return nil, err
@@ -300,6 +462,7 @@ func (s *Service) UncompleteTask(ctx context.Context, id int64) (*model.Task, er
 			}
 		}
 		t.Status, t.CompletedAt, t.UpdatedAt = model.TaskPending, nil, now
+		t.NextAlertAt = s.nextAlert(t, now)
 		return tx.UpdateTask(ctx, t)
 	})
 	return t, err
@@ -346,20 +509,22 @@ func (s *Service) processTasks(ctx context.Context, now time.Time) error {
 				if err != nil {
 					return err
 				}
-				if o.ID != 0 && !o.IsOpen() {
+				if o.ID != 0 {
+					// closeOcc also removes the buttons of an alert sent for this instance.
+					if err := s.closeOcc(ctx, tx, o, model.OccMissed, model.SourceSystem, now); err != nil {
+						return err
+					}
 					continue
 				}
 				o.Status, o.ActionSource, o.UpdatedAt = model.OccMissed, model.SourceSystem, now
-				if o.ID == 0 {
-					_, err = tx.InsertOccurrence(ctx, o)
-				} else {
-					err = tx.UpdateOccurrence(ctx, o)
-				}
-				if err != nil {
+				if _, err := tx.InsertOccurrence(ctx, o); err != nil {
 					return err
 				}
 			}
-			t.DueAt = ptr(latest.UTC())
+			moveDue(&t, latest)
+			if t.NextAlertAt == nil || !t.NextAlertAt.After(now) {
+				t.NextAlertAt = s.nextAlert(&t, now)
+			}
 			t.UpdatedAt = now
 			if err := tx.UpdateTask(ctx, &t); err != nil {
 				return err

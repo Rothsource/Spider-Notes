@@ -619,17 +619,29 @@ components:
       properties:
         title: { type: string, maxLength: 300 }
         description_md: { type: string, maxLength: 20000 }
+        start_at: { type: [string, "null"], format: date-time, description: "Optional start; must not be after due_at. Moves with due_at for repeating tasks." }
         due_at: { type: [string, "null"], format: date-time }
+        alert: { $ref: "#/components/schemas/TaskAlert" }
         priority: { $ref: "#/components/schemas/Priority" }
         tags: { type: array, items: { type: string } }
         repeat: { oneOf: [ { $ref: "#/components/schemas/Repeat" }, { type: "null" } ], description: "daily/weekly/monthly only; requires due_at" }
+    TaskAlert:
+      type: string
+      enum: ["", start, due, 5m, 15m, 30m, 1h, 2h, 1d]
+      description: >-
+        Built-in Telegram alert for each due instance. "" = none, "start" = at start_at,
+        "due" = at due_at, otherwise that long before due_at. Requires due_at ("start" also start_at).
+        Global quiet hours apply; the message has Done / Snooze / Skip buttons.
     Task:
       type: object
       properties:
         id: { type: integer }
         title: { type: string }
         description_md: { type: string }
+        start_at: { type: [string, "null"], format: date-time }
         due_at: { type: [string, "null"], format: date-time }
+        alert: { $ref: "#/components/schemas/TaskAlert" }
+        next_alert_at: { type: [string, "null"], format: date-time, description: "When the next alert is sent (absent when none is scheduled)" }
         priority: { $ref: "#/components/schemas/Priority" }
         status: { type: string, enum: [pending, done] }
         repeat_rule: { type: string, description: RRULE }

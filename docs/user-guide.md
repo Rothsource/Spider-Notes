@@ -64,12 +64,17 @@ empty), the others are still uploaded and the failures are listed.
 
 - **Tabs**: Pending / Done / All. **Chips**: any time, today, this week, overdue, no date.
 - Filter by priority and tag, or search the text.
-- **New task**: title, Markdown notes, due date/time, priority, tags and repeat.
+- **New task**: title, Markdown notes, start and due date/time, alert, priority, tags and repeat.
+  - **Start** (optional) and **Due** give the task a time range, shown as `start → due` in the list.
+  - **Alert** sends a Telegram message with Done / Snooze / Skip buttons: *None*, *At start time*,
+    *At due time*, or 5 min / 15 min / 30 min / 1 h / 2 h / 1 day before the due time.
+    An alert needs a due date. Global quiet hours apply.
   - Repeat: never, daily (every *N* days), weekly (choose weekdays), monthly (day of month), optional end date.
-  - The repeat time comes from the due time.
+  - The repeat time comes from the due time; the start moves along, keeping its distance to the due time.
 - Completing a repeating task records the completion and moves the due date to
   the next occurrence. **Skip occurrence** moves on without completing.
-- **Save & add reminder** opens a reminder pre-filled for that task.
+- **Save & add reminder** opens a reminder pre-filled for that task. Use reminders when you need
+  more than one notification, nag mode, or a custom message; the alert covers the common case.
 - The task page lists its reminders and its history.
 
 ## Reminders

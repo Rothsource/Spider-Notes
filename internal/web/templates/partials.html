@@ -45,7 +45,8 @@
   <a class="task-body" href="/tasks/{{.ID}}">
     <span class="task-title">{{.Title}}</span>
     <span class="meta">
-      {{if .DueAt}}<span class="due">{{icon "calendar"}}{{short .DueAt}}</span>{{end}}
+      {{if .DueAt}}<span class="due">{{icon "calendar"}}{{with .StartAt}}{{short .}} → {{end}}{{short .DueAt}}</span>{{end}}
+      {{if .Alert}}<span title="Telegram alert">{{icon "bell"}}</span>{{end}}
       {{if .RepeatRule}}<span title="{{rule .RepeatRule ""}}">{{icon "repeat"}}{{rule .RepeatRule ""}}</span>{{end}}
       {{if eq .Priority "high"}}<span class="pill danger">{{icon "flag"}}high</span>{{else if eq .Priority "low"}}<span class="pill">low</span>{{end}}
       {{range .Tags}}<span class="tag">#{{.}}</span>{{end}}
