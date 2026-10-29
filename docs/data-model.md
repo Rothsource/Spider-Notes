@@ -79,7 +79,6 @@ reminder tags are entered in a field. Tag names are lower-case.
 ### Expenses
 | Table | Key columns | Notes |
 |---|---|---|
-|---|---|
 | `expenses` | item, amount_minor, currency (`USD`/`KHR`/`THB`/`EUR`), category, payment, note, spent_at, deleted_at | |
 | `expense_categories` | name (unique, case-insensitive), emoji, position | The category picker. Presets are added by the migration; `expenses.category` stores the name as text |
 
