@@ -26,7 +26,7 @@
       </div>
       <div class="field-grid">
         {{template "catpicker" (dict "Cats" .Categories "Sel" "" "Back" .Back)}}
-        <label>{{icon "wallet"}} Payment <span class="muted">(optional)</span><input name="payment" list="exp-pays" maxlength="60" placeholder="Cash, ABA, Card…"></label>
+        <label>{{icon "wallet"}} Payment<input name="payment" list="exp-pays" maxlength="60" placeholder="Optional: Cash, ABA, Card…"></label>
       </div>
       <textarea name="note" rows="2" maxlength="20000" placeholder="Description (optional)" aria-label="Description" data-autosize></textarea>
       <div class="form-actions">
