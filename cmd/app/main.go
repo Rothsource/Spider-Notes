@@ -95,7 +95,8 @@ func serve() error {
 	}
 
 	svc := service.New(service.Options{Store: db, Location: cfg.Location, ExportDir: cfg.ExportDir,
-		EnvTelegramTok: cfg.TelegramToken, EnvTelegramID: cfg.TelegramChatID})
+		EnvTelegramTok: cfg.TelegramToken, EnvTelegramID: cfg.TelegramChatID,
+		AttachDir: cfg.AttachmentsDir, MaxUpload: cfg.MaxUploadBytes})
 
 	var wg sync.WaitGroup
 	bot := telegram.New(svc, nil)
@@ -125,15 +126,17 @@ func serve() error {
 		}
 		_, _ = w.Write([]byte("ok"))
 	})
+	api.ServeFile = web.ServeAttachment
 	api.Register(mux, svc, am)
 	ui.Register(mux)
 
 	srv := &http.Server{
-		Addr:              cfg.Listen,
-		Handler:           logRequests(web.SecurityHeaders(mux)),
+		Addr: cfg.Listen,
+		// Cap every request body (uploads included) slightly above the upload limit.
+		Handler:           logRequests(web.SecurityHeaders(http.MaxBytesHandler(mux, cfg.MaxUploadBytes+(1<<20)))),
 		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
+		ReadTimeout:       10 * time.Minute,
+		WriteTimeout:      10 * time.Minute, // large file downloads/uploads
 		IdleTimeout:       120 * time.Second,
 	}
 	errCh := make(chan error, 1)

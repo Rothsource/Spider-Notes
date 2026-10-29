@@ -23,7 +23,8 @@
     </a>
     <nav class="sb-nav">
       <a href="/" class="sb-link {{if eq .Path "/"}}active{{end}}">{{icon "home"}}<span>Today</span>{{with .OpenCount}}<span class="sb-count">{{.}}</span>{{end}}</a>
-      <a href="/memos" class="sb-link {{if prefix .Path "/memos"}}active{{end}}">{{icon "memo"}}<span>Memos</span></a>
+      <a href="/memos" class="sb-link {{if prefix .Path "/memos"}}active{{end}}">{{icon "memo"}}<span>Spider Notes</span></a>
+      <a href="/notes" class="sb-link {{if prefix .Path "/notes"}}active{{end}}">{{icon "folder"}}<span>Folders</span></a>
       <a href="/tasks" class="sb-link {{if prefix .Path "/tasks"}}active{{end}}">{{icon "tasks"}}<span>Tasks</span></a>
       <a href="/reminders" class="sb-link {{if prefix .Path "/reminders"}}active{{end}}">{{icon "bell"}}<span>Reminders</span></a>
       <a href="/calendar" class="sb-link {{if prefix .Path "/calendar"}}active{{end}}">{{icon "calendar"}}<span>Calendar</span></a>

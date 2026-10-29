@@ -203,7 +203,7 @@ func (s *Server) memosPage(w http.ResponseWriter, r *http.Request) {
 		pinned, _ = s.svc.PinnedMemos(r.Context())
 	}
 	heat, stats := s.memoActivity(r)
-	s.render(w, r, "memos", page{"Title": "Memos", "Page": mp, "Tags": tags, "Pinned": pinned,
+	s.render(w, r, "memos", page{"Title": "Spider Notes", "Page": mp, "Tags": tags, "Pinned": pinned,
 		"Tag": q.Get("tag"), "Q": q.Get("q"), "Date": q.Get("date"), "Heat": heat, "Stats": stats})
 }
 

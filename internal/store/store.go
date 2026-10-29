@@ -22,6 +22,8 @@ type Store interface {
 	Memos
 	Tags
 	Search
+	Notes
+	Attachments
 
 	// InTx runs fn inside a transaction. The Store passed to fn must be used
 	// for all operations within the transaction.
@@ -120,6 +122,33 @@ type Tags interface {
 	SetMemoTags(ctx context.Context, id int64, tags []string) error
 	// TagCounts returns tag usage; kind is "memo", "task", "reminder" or "" for all.
 	TagCounts(ctx context.Context, kind string) ([]model.TagCount, error)
+}
+
+// Notes persists folders and notes.
+type Notes interface {
+	CreateFolder(ctx context.Context, f *model.Folder) error
+	UpdateFolder(ctx context.Context, f *model.Folder) error
+	GetFolder(ctx context.Context, id int64) (*model.Folder, error)
+	// ListFolders returns all non-deleted folders ordered by name.
+	ListFolders(ctx context.Context) ([]model.Folder, error)
+	SoftDeleteFolder(ctx context.Context, id int64, at time.Time) error
+
+	CreateNote(ctx context.Context, n *model.Note) error
+	UpdateNote(ctx context.Context, n *model.Note) error
+	GetNote(ctx context.Context, id int64) (*model.Note, error)
+	// ListNotes lists notes in a folder (folderID 0 = top level); all=true ignores the folder.
+	ListNotes(ctx context.Context, folderID int64, all bool) ([]model.Note, error)
+	SoftDeleteNote(ctx context.Context, id int64, at time.Time) error
+	SetNoteTags(ctx context.Context, id int64, tags []string) error
+}
+
+// Attachments persists uploaded file metadata.
+type Attachments interface {
+	CreateAttachment(ctx context.Context, a *model.Attachment) error
+	UpdateAttachment(ctx context.Context, a *model.Attachment) error
+	GetAttachment(ctx context.Context, id int64) (*model.Attachment, error)
+	ListAttachments(ctx context.Context, f model.AttachmentFilter) ([]model.Attachment, error)
+	SoftDeleteAttachment(ctx context.Context, id int64, at time.Time) error
 }
 
 // Search runs full-text search.

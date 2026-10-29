@@ -39,7 +39,7 @@ func newApp(t *testing.T) *testApp {
 	}
 	t.Cleanup(func() { db.Close() })
 	loc, _ := time.LoadLocation("Asia/Phnom_Penh")
-	svc := service.New(service.Options{Store: db, Location: loc, ExportDir: t.TempDir()})
+	svc := service.New(service.Options{Store: db, Location: loc, ExportDir: t.TempDir(), AttachDir: t.TempDir()})
 	am := auth.NewManager(db, strings.Repeat("s", 40), time.Hour, false)
 	if err := am.EnsureAdmin(ctx, "me", "correct-horse-battery"); err != nil {
 		t.Fatal(err)
@@ -49,6 +49,7 @@ func newApp(t *testing.T) *testApp {
 		t.Fatal(err)
 	}
 	mux := http.NewServeMux()
+	api.ServeFile = web.ServeAttachment
 	api.Register(mux, svc, am)
 	ui.Register(mux)
 	srv := httptest.NewServer(web.SecurityHeaders(mux))

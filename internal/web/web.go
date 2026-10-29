@@ -146,6 +146,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	p("POST /settings/{section}", s.settingsSave)
 	p("GET /settings/export.zip", s.exportZip)
 	p("POST /settings/tokens/{id}/revoke", s.revokeToken)
+	s.registerNotes(p)
 }
 
 // ---- rendering ----
@@ -169,6 +170,9 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 	data["V"] = s.assetV
 	if _, ok := data["Msg"]; !ok {
 		data["Msg"] = r.URL.Query().Get("msg")
+	}
+	if _, ok := data["Error"]; !ok {
+		data["Error"] = r.URL.Query().Get("err")
 	}
 	if data["CSRF"] != "" {
 		data["User"] = s.auth.Username(r.Context())
@@ -372,6 +376,29 @@ func (s *Server) funcs() template.FuncMap {
 			return tt.Format("02 Jan 2006 15:04")
 		},
 		"prefix": strings.HasPrefix,
+		"size": func(n int64) string {
+			switch {
+			case n >= 1<<30:
+				return fmt.Sprintf("%.1f GB", float64(n)/(1<<30))
+			case n >= 1<<20:
+				return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
+			case n >= 1<<10:
+				return fmt.Sprintf("%.0f KB", float64(n)/(1<<10))
+			}
+			return fmt.Sprintf("%d B", n)
+		},
+		"fileicon": func(mt string) string {
+			switch {
+			case strings.HasPrefix(mt, "image/"):
+				return "image"
+			case mt == "application/pdf", strings.HasPrefix(mt, "text/"):
+				return "file-text"
+			case strings.HasPrefix(mt, "video/"), strings.HasPrefix(mt, "audio/"):
+				return "play"
+			}
+			return "file"
+		},
+		"atturl": func(a model.Attachment) string { return service.AttachmentURL(&a) },
 		"initial": func(s string) string {
 			for _, r := range s {
 				return strings.ToUpper(string(r))

@@ -1,0 +1,67 @@
+{{define "content"}}
+{{$n := .N}}
+<div class="narrow note-page">
+  <nav class="crumbs" aria-label="Folder path">
+    <a href="/notes">{{icon "folder"}}Folders</a>
+    {{range .FolderPath}}<span class="crumb-sep">/</span><a href="/notes/folder/{{.ID}}">{{.Name}}</a>{{end}}
+  </nav>
+
+  {{if .Edit}}
+  <form class="card note-editor" method="post" action="/notes/{{$n.ID}}" id="note-form" data-owner="note_id" data-owner-id="{{$n.ID}}" data-ctrl-s>
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <input class="title-input note-title" name="title" value="{{$n.Title}}" placeholder="Untitled" maxlength="300" aria-label="Title" {{if eq $n.Title "Untitled"}}autofocus{{end}}>
+    <div class="editor-bar top">
+      <div class="tabs compact" role="tablist">
+        <button type="button" class="tab active" data-note-tab="write">{{icon "edit"}}Write</button>
+        <button type="button" class="tab" data-note-tab="preview">{{icon "eye"}}Preview</button>
+      </div>
+      <span class="grow"></span>
+      {{template "editor-tools"}}
+    </div>
+    <textarea name="content" class="editor-input note-input" data-autosize data-ctrl-enter placeholder="Write in Markdown. Drop or paste images and files to attach them." {{if ne $n.Title "Untitled"}}autofocus{{end}}>{{$n.ContentMD}}</textarea>
+    <div class="md note-preview" data-preview hidden></div>
+    <div class="form-actions">
+      <span class="editor-hint">Ctrl+S saves · Ctrl+Enter saves and closes</span>
+      <span class="grow"></span>
+      <a class="btn ghost" href="/notes/{{$n.ID}}">Cancel</a>
+      <button class="btn primary">Save</button>
+    </div>
+  </form>
+  {{else}}
+  <article class="card note-view">
+    <header class="note-head">
+      <h1>{{if $n.Pinned}}<span class="pin-dot">{{icon "pin"}}</span>{{end}}{{$n.Title}}</h1>
+      <div class="row gap">
+        <a class="btn primary" href="/notes/{{$n.ID}}?edit=1">{{icon "edit"}}Edit</a>
+        {{template "itemmenu" (dict "Kind" "note" "ID" $n.ID "Name" $n.Title "Flat" .Flat "CSRF" .CSRF "Back" (printf "/notes/%d" $n.ID) "Pinned" $n.Pinned)}}
+      </div>
+    </header>
+    <div class="meta note-meta">
+      <span>{{icon "clock"}}edited {{ago $n.UpdatedAt}}</span>
+      <span>created {{dt $n.CreatedAt}}</span>
+      {{range $n.Tags}}<a class="tag" href="/search?q={{.}}">#{{.}}</a>{{end}}
+    </div>
+    {{if $n.ContentMD}}{{template "notebody" (dict "Data" $n "CSRF" .CSRF)}}
+    {{else}}<div class="empty small"><p>This note is empty. <a href="/notes/{{$n.ID}}?edit=1">Start writing</a>.</p></div>{{end}}
+  </article>
+  {{end}}
+
+  {{if .Files}}
+  <section class="section">
+    <div class="section-label">{{icon "paperclip"}} Attachments <span class="count">{{len .Files}}</span></div>
+    <div class="card list-card">
+      {{range .Files}}
+      <div class="item-row">
+        <a class="item-main" href="{{atturl .}}" target="_blank" rel="noopener">
+          {{if .IsImage}}<img class="item-thumb" src="{{atturl .}}" alt="" loading="lazy">{{else}}<span class="item-icon file">{{icon (fileicon .Mime)}}</span>{{end}}
+          <span class="grow"><span class="list-title">{{.Filename}}</span><span class="meta"><span>{{size .Size}}</span><span>{{ago .CreatedAt}}</span></span></span>
+        </a>
+        <a class="icon-btn" href="{{atturl .}}?download=1" title="Download" aria-label="Download">{{icon "download"}}</a>
+        {{template "itemmenu" (dict "Kind" "file" "ID" .ID "Name" .Filename "Flat" $.Flat "CSRF" $.CSRF "Back" (printf "/notes/%d" $n.ID))}}
+      </div>
+      {{end}}
+    </div>
+  </section>
+  {{end}}
+</div>
+{{end}}

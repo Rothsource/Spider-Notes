@@ -24,6 +24,8 @@ type Config struct {
 	TelegramChatID     int64
 	SchedulerInterval  time.Duration
 	ExportDir          string
+	AttachmentsDir     string
+	MaxUploadBytes     int64
 	TrustProxy         bool
 	LogLevel           string
 }
@@ -36,15 +38,16 @@ func Load() (*Config, error) {
 // LoadFrom reads configuration using the given lookup function (useful for tests).
 func LoadFrom(get func(string) string) (*Config, error) {
 	c := &Config{
-		Listen:        def(get("APP_LISTEN"), ":8080"),
-		DBPath:        def(get("APP_DB_PATH"), "/data/app.db"),
-		Timezone:      def(get("APP_TIMEZONE"), "Asia/Phnom_Penh"),
-		AdminUsername: strings.TrimSpace(get("APP_ADMIN_USERNAME")),
-		AdminPassword: get("APP_ADMIN_PASSWORD"),
-		SessionSecret: get("APP_SESSION_SECRET"),
-		TelegramToken: strings.TrimSpace(get("TELEGRAM_BOT_TOKEN")),
-		ExportDir:     def(get("APP_EXPORT_DIR"), "/data/export"),
-		LogLevel:      def(get("APP_LOG_LEVEL"), "info"),
+		Listen:         def(get("APP_LISTEN"), ":8080"),
+		DBPath:         def(get("APP_DB_PATH"), "/data/app.db"),
+		Timezone:       def(get("APP_TIMEZONE"), "Asia/Phnom_Penh"),
+		AdminUsername:  strings.TrimSpace(get("APP_ADMIN_USERNAME")),
+		AdminPassword:  get("APP_ADMIN_PASSWORD"),
+		SessionSecret:  get("APP_SESSION_SECRET"),
+		TelegramToken:  strings.TrimSpace(get("TELEGRAM_BOT_TOKEN")),
+		ExportDir:      def(get("APP_EXPORT_DIR"), "/data/export"),
+		AttachmentsDir: def(get("APP_ATTACHMENTS_DIR"), "/data/attachments"),
+		LogLevel:       def(get("APP_LOG_LEVEL"), "info"),
 	}
 	var errs []error
 
@@ -65,6 +68,11 @@ func LoadFrom(get func(string) string) (*Config, error) {
 			errs = append(errs, fmt.Errorf("TELEGRAM_CHAT_ID: must be an integer"))
 		}
 	}
+	mb, err := strconv.Atoi(def(get("APP_MAX_UPLOAD_MB"), "50"))
+	if err != nil || mb < 1 || mb > 2048 {
+		errs = append(errs, fmt.Errorf("APP_MAX_UPLOAD_MB: must be 1..2048"))
+	}
+	c.MaxUploadBytes = int64(mb) << 20
 	c.TrustProxy, _ = strconv.ParseBool(get("APP_TRUST_PROXY"))
 	return c, errors.Join(errs...)
 }

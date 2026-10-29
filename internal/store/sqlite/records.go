@@ -284,8 +284,11 @@ func (d *DB) Search(ctx context.Context, q string, limit int) ([]model.SearchHit
 		UNION ALL
 		SELECT 'reminder', r.id, '', snippet(reminders_fts, 0, ?, ?, '…', 16), r.updated_at
 		  FROM reminders_fts JOIN reminders r ON r.id = reminders_fts.rowid WHERE reminders_fts MATCH ? AND r.deleted_at IS NULL
+		UNION ALL
+		SELECT 'note', n.id, n.title, snippet(notes_fts, -1, ?, ?, '…', 16), n.updated_at
+		  FROM notes_fts JOIN notes n ON n.id = notes_fts.rowid WHERE notes_fts MATCH ? AND n.deleted_at IS NULL
 		ORDER BY 5 DESC LIMIT ?`,
-		MarkStart, MarkEnd, q, MarkStart, MarkEnd, q, MarkStart, MarkEnd, q, limit)
+		MarkStart, MarkEnd, q, MarkStart, MarkEnd, q, MarkStart, MarkEnd, q, MarkStart, MarkEnd, q, limit)
 	if err != nil {
 		if strings.Contains(err.Error(), "fts5") || strings.Contains(err.Error(), "syntax error") {
 			return nil, errors.Join(model.Invalid("invalid search query"), err)

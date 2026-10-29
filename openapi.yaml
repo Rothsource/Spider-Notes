@@ -23,6 +23,7 @@ tags:
   - name: reminders
   - name: occurrences
   - name: memos
+  - name: notes
   - name: views
 
 paths:
@@ -319,6 +320,156 @@ paths:
         "200": { description: Memo, content: { application/json: { schema: { $ref: "#/components/schemas/Memo" } } } }
         default: { $ref: "#/components/responses/Error" }
 
+  /folders:
+    get:
+      tags: [notes]
+      operationId: listFolders
+      summary: All folders, depth-first, with their full path
+      responses:
+        "200": { description: Folders, content: { application/json: { schema: { type: object, properties: { folders: { type: array, items: { $ref: "#/components/schemas/Folder" } } } } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [notes]
+      operationId: createFolder
+      summary: Create a folder (parent_id null = top level)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string, maxLength: 120 }, parent_id: { type: [integer, "null"] } } } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Folder" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /folders/{id}:
+    parameters: [ { name: id, in: path, required: true, description: "Folder id; 0 = top level (GET only)", schema: { type: integer, minimum: 0 } } ]
+    get:
+      tags: [notes]
+      operationId: getFolderContents
+      summary: Subfolders, notes and files directly inside a folder
+      responses:
+        "200":
+          description: Contents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  folder: { $ref: "#/components/schemas/Folder" }
+                  path: { type: array, items: { $ref: "#/components/schemas/Folder" } }
+                  folders: { type: array, items: { $ref: "#/components/schemas/Folder" } }
+                  notes: { type: array, items: { $ref: "#/components/schemas/Note" } }
+                  files: { type: array, items: { $ref: "#/components/schemas/Attachment" } }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      tags: [notes]
+      operationId: updateFolder
+      summary: Rename (name) and/or move (parent_id; set move=true with parent_id null to move to the top level)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { name: { type: string }, parent_id: { type: [integer, "null"] }, move: { type: boolean } } } } } }
+      responses:
+        "200": { description: Folder, content: { application/json: { schema: { $ref: "#/components/schemas/Folder" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [notes]
+      operationId: deleteFolder
+      summary: Delete a folder and everything inside it
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /notes:
+    get:
+      tags: [notes]
+      operationId: listNotes
+      summary: List notes (all, or one folder with folder_id; 0 = top level)
+      parameters:
+        - { name: folder_id, in: query, schema: { type: integer } }
+      responses:
+        "200": { description: Notes, content: { application/json: { schema: { type: object, properties: { notes: { type: array, items: { $ref: "#/components/schemas/Note" } } } } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [notes]
+      operationId: createNote
+      summary: Create a note
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/NoteInput" } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Note" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /notes/{id}:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    get:
+      tags: [notes]
+      operationId: getNote
+      summary: Get a note
+      responses:
+        "200": { description: Note, content: { application/json: { schema: { $ref: "#/components/schemas/Note" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      tags: [notes]
+      operationId: updateNote
+      summary: Update any of title, content_md, folder_id (0 = top level), pinned
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/NoteInput" } } } }
+      responses:
+        "200": { description: Note, content: { application/json: { schema: { $ref: "#/components/schemas/Note" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [notes]
+      operationId: deleteNote
+      summary: Delete a note
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /attachments:
+    get:
+      tags: [notes]
+      operationId: listAttachments
+      summary: Files in a folder (folder_id, 0 = top level) or attached to a memo/note
+      parameters:
+        - { name: folder_id, in: query, schema: { type: integer } }
+        - { name: memo_id, in: query, schema: { type: integer } }
+        - { name: note_id, in: query, schema: { type: integer } }
+      responses:
+        "200": { description: Files, content: { application/json: { schema: { type: object, properties: { attachments: { type: array, items: { $ref: "#/components/schemas/Attachment" } } } } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [notes]
+      operationId: uploadAttachment
+      summary: Upload a file (multipart). Optionally set one of folder_id, memo_id, note_id.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                folder_id: { type: integer }
+                memo_id: { type: integer }
+                note_id: { type: integer }
+      responses:
+        "201": { description: Uploaded, content: { application/json: { schema: { $ref: "#/components/schemas/Attachment" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /attachments/{id}:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    get:
+      tags: [notes]
+      operationId: getAttachment
+      summary: File metadata
+      responses:
+        "200": { description: File, content: { application/json: { schema: { $ref: "#/components/schemas/Attachment" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [notes]
+      operationId: deleteAttachment
+      summary: Delete a file
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /attachments/{id}/content:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    get:
+      tags: [notes]
+      operationId: downloadAttachment
+      summary: Download the file bytes (supports Range)
+      responses:
+        "200": { description: File content, content: { application/octet-stream: { schema: { type: string, format: binary } } } }
+        default: { $ref: "#/components/responses/Error" }
+
   /tags:
     get:
       tags: [views]
@@ -539,6 +690,47 @@ components:
         action_source: { type: string, enum: ["", web, telegram, api, system] }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+    Folder:
+      type: object
+      properties:
+        id: { type: integer }
+        parent_id: { type: [integer, "null"] }
+        name: { type: string }
+        path: { type: string, description: "Full path, e.g. 'Work / Projects' (list endpoint only)" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    NoteInput:
+      type: object
+      properties:
+        title: { type: string, maxLength: 300 }
+        content_md: { type: string, maxLength: 200000 }
+        folder_id: { type: [integer, "null"] }
+        pinned: { type: boolean }
+    Note:
+      type: object
+      properties:
+        id: { type: integer }
+        folder_id: { type: [integer, "null"] }
+        title: { type: string }
+        content_md: { type: string }
+        pinned: { type: boolean }
+        tags: { type: array, items: { type: string } }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Attachment:
+      type: object
+      properties:
+        id: { type: integer }
+        folder_id: { type: [integer, "null"] }
+        memo_id: { type: [integer, "null"] }
+        note_id: { type: [integer, "null"] }
+        filename: { type: string }
+        mime: { type: string }
+        size: { type: integer }
+        sha256: { type: string }
+        url: { type: string, description: API download URL }
+        markdown: { type: string, description: "Snippet to embed it in a memo or note" }
+        created_at: { type: string, format: date-time }
     MemoInput:
       type: object
       required: [content_md]

@@ -77,7 +77,7 @@
       </div>
     </div>
   </header>
-  <div class="md memo-body">{{mdi .ContentMD}}</div>
+  <div class="md memo-body" data-toggle-base="/memos/{{.ID}}/toggle">{{mdi .ContentMD}}</div>
   {{if .Tags}}<footer class="memo-tags">{{range .Tags}}<a class="tag" href="/memos?tag={{.}}">#{{.}}</a>{{end}}</footer>{{end}}
 </article>
 {{end}}{{end}}
@@ -87,11 +87,69 @@
   <button type="button" class="icon-btn" data-insert="#" title="Add a tag" aria-label="Add a tag">{{icon "hash"}}</button>
   <button type="button" class="icon-btn" data-insert="- [ ] " data-line title="Add a checkbox" aria-label="Add a checkbox">{{icon "checklist"}}</button>
   <button type="button" class="icon-btn" data-insert="`" data-wrap title="Code" aria-label="Code">{{icon "code"}}</button>
+  {{template "attach-btn"}}
 </div>
 {{end}}
 
+{{define "itemmenu"}}
+{{$base := ""}}{{$moveField := "folder_id"}}{{$what := "file"}}
+{{if eq .Kind "folder"}}{{$base = printf "/notes/folders/%d" .ID}}{{$moveField = "parent_id"}}{{$what = "folder"}}
+{{else if eq .Kind "note"}}{{$base = printf "/notes/%d" .ID}}{{$what = "note"}}
+{{else}}{{$base = printf "/attachments/%d" .ID}}{{end}}
+<div class="dropdown">
+  <button class="icon-btn" type="button" data-toggle-menu aria-label="Actions for {{.Name}}">{{icon "more"}}</button>
+  <div class="menu" hidden>
+    {{if eq .Kind "note"}}
+    <form method="post" action="{{$base}}/{{if .Pinned}}unpin{{else}}pin{{end}}">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}"><input type="hidden" name="back" value="{{.Back}}">
+      <button class="menu-item">{{icon "pin"}}{{if .Pinned}}Unpin{{else}}Pin to top{{end}}</button>
+    </form>
+    {{end}}
+    <form method="post" action="{{$base}}/rename" data-prompt="New name for this {{$what}}" data-prompt-value="{{.Name}}">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}"><input type="hidden" name="back" value="{{.Back}}">
+      <input type="hidden" name="name">
+      <button class="menu-item">{{icon "edit"}}Rename</button>
+    </form>
+    <form method="post" action="{{$base}}/move" class="menu-move">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <span class="menu-label">{{icon "move"}}Move to</span>
+      <select name="{{$moveField}}" aria-label="Move to folder">
+        <option value="0">Top level</option>
+        {{$self := .ID}}{{$kind := .Kind}}
+        {{range .Flat}}{{if not (and (eq $kind "folder") (eq .Folder.ID $self))}}<option value="{{.Folder.ID}}">{{.Path}}</option>{{end}}{{end}}
+      </select>
+      <button class="btn small">Move</button>
+    </form>
+    <form method="post" action="{{$base}}/delete" data-confirm="Delete this {{$what}}?{{if eq .Kind "folder"}} Everything inside it is deleted too.{{end}}">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}"><input type="hidden" name="back" value="{{.Back}}">
+      <button class="menu-item danger">{{icon "trash"}}Delete</button>
+    </form>
+  </div>
+</div>
+{{end}}
+
+{{define "foldertree"}}
+<ul class="tree-list">
+  {{range .Nodes}}
+  <li>
+    <a class="tree-link {{if eq .Folder.ID $.Cur}}active{{end}}" href="/notes/folder/{{.Folder.ID}}">{{icon "folder"}}<span>{{.Folder.Name}}</span></a>
+    {{if .Children}}{{template "foldertree" (dict "Nodes" .Children "Cur" $.Cur)}}{{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}
+
+{{define "notebody"}}{{with .Data}}
+<div class="md note-body" id="note-body" data-toggle-base="/notes/{{.ID}}/toggle">{{mdi .ContentMD}}</div>
+{{end}}{{end}}
+
+{{define "attach-btn"}}
+<button type="button" class="icon-btn" data-upload title="Attach a file or image" aria-label="Attach a file">{{icon "paperclip"}}</button>
+<input type="file" data-upload-input multiple hidden>
+{{end}}
+
 {{define "memoedit"}}{{with .Data}}
-<form class="memo editor editing" id="memo-{{.ID}}" hx-post="/memos/{{.ID}}" hx-target="this" hx-swap="outerHTML">
+<form class="memo editor editing" id="memo-{{.ID}}" data-owner="memo_id" data-owner-id="{{.ID}}" hx-post="/memos/{{.ID}}" hx-target="this" hx-swap="outerHTML">
   <textarea name="content" rows="5" maxlength="20000" class="editor-input" data-autosize data-ctrl-enter required>{{.ContentMD}}</textarea>
   <div class="editor-bar">
     {{template "editor-tools"}}

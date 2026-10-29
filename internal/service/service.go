@@ -78,6 +78,8 @@ type Options struct {
 	EnvTelegramTok string
 	EnvTelegramID  int64
 	Now            func() time.Time
+	AttachDir      string // where uploaded files are stored
+	MaxUpload      int64  // bytes; 0 = 50 MB
 }
 
 // Service implements all use cases.
@@ -88,6 +90,8 @@ type Service struct {
 	exportDir string
 	envTgTok  string
 	envTgID   int64
+	attachDir string
+	maxUpload int64
 
 	mu         sync.RWMutex
 	notifier   Notifier
@@ -102,8 +106,12 @@ func New(o Options) *Service {
 	if o.Location == nil {
 		o.Location = time.UTC
 	}
+	if o.MaxUpload <= 0 {
+		o.MaxUpload = 50 << 20
+	}
 	return &Service{st: o.Store, loc: o.Location, now: o.Now, exportDir: o.ExportDir,
-		envTgTok: o.EnvTelegramTok, envTgID: o.EnvTelegramID, notifier: nopNotifier{}}
+		envTgTok: o.EnvTelegramTok, envTgID: o.EnvTelegramID, notifier: nopNotifier{},
+		attachDir: o.AttachDir, maxUpload: o.MaxUpload}
 }
 
 // SetNotifier installs the notifier (nil disables notifications).

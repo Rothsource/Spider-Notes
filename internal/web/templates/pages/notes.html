@@ -1,0 +1,89 @@
+{{define "content"}}
+{{$c := .C}}{{$cur := .Cur}}{{$flat := .Flat}}{{$csrf := .CSRF}}
+{{$here := "/notes"}}{{with $c.Folder}}{{$here = printf "/notes/folder/%d" .ID}}{{end}}
+<div class="with-rail">
+  <div class="feed">
+    <nav class="crumbs" aria-label="Folder path">
+      <a href="/notes">{{icon "folder"}}Folders</a>
+      {{range $c.Path}}<span class="crumb-sep">/</span><a href="/notes/folder/{{.ID}}">{{.Name}}</a>{{end}}
+    </nav>
+
+    <div class="page-head">
+      <h1>{{with $c.Folder}}{{.Name}}{{else}}All folders{{end}}</h1>
+      <div class="row gap wrap">
+        <form method="post" action="/notes" class="inline">
+          <input type="hidden" name="csrf_token" value="{{$csrf}}">
+          {{if $cur}}<input type="hidden" name="folder_id" value="{{$cur}}">{{end}}
+          <button class="btn primary">{{icon "file-plus"}}New note</button>
+        </form>
+        <details class="popover">
+          <summary class="btn">{{icon "folder-plus"}}New folder</summary>
+          <form method="post" action="/notes/folders" class="popover-body">
+            <input type="hidden" name="csrf_token" value="{{$csrf}}">
+            {{if $cur}}<input type="hidden" name="parent_id" value="{{$cur}}">{{end}}
+            <input name="name" placeholder="Folder name" required maxlength="120" aria-label="Folder name">
+            <button class="btn primary">Create</button>
+          </form>
+        </details>
+        <form method="post" action="/notes/upload" enctype="multipart/form-data" class="inline" id="upload-form">
+          <input type="hidden" name="csrf_token" value="{{$csrf}}">
+          {{if $cur}}<input type="hidden" name="folder_id" value="{{$cur}}">{{end}}
+          <label class="btn file-btn">{{icon "upload"}}Upload<input type="file" name="files" multiple data-autosubmit hidden></label>
+        </form>
+      </div>
+    </div>
+
+    <div class="dropzone" data-dropzone="#upload-form">
+      {{if or $c.Folders $c.Notes $c.Files}}
+      <div class="card list-card">
+        {{range $c.Folders}}
+        <div class="item-row">
+          <a class="item-main" href="/notes/folder/{{.ID}}">
+            <span class="item-icon folder">{{icon "folder"}}</span>
+            <span class="grow"><span class="list-title">{{.Name}}</span><span class="meta"><span>folder · {{ago .UpdatedAt}}</span></span></span>
+          </a>
+          {{template "itemmenu" (dict "Kind" "folder" "ID" .ID "Name" .Name "Flat" $flat "CSRF" $csrf "Back" $here "Self" .ID)}}
+        </div>
+        {{end}}
+        {{range $c.Notes}}
+        <div class="item-row">
+          <a class="item-main" href="/notes/{{.ID}}">
+            <span class="item-icon note">{{icon "file-text"}}</span>
+            <span class="grow">
+              <span class="list-title">{{if .Pinned}}<span class="pin-dot">{{icon "pin"}}</span>{{end}}{{.Title}}</span>
+              <span class="meta"><span>edited {{ago .UpdatedAt}}</span>{{range .Tags}}<span class="tag">#{{.}}</span>{{end}}</span>
+              {{with firstline .ContentMD}}<span class="item-snippet">{{.}}</span>{{end}}
+            </span>
+          </a>
+          {{template "itemmenu" (dict "Kind" "note" "ID" .ID "Name" .Title "Flat" $flat "CSRF" $csrf "Back" $here "Pinned" .Pinned)}}
+        </div>
+        {{end}}
+        {{range $c.Files}}
+        <div class="item-row">
+          <a class="item-main" href="{{atturl .}}" target="_blank" rel="noopener">
+            {{if .IsImage}}<img class="item-thumb" src="{{atturl .}}" alt="" loading="lazy">{{else}}<span class="item-icon file">{{icon (fileicon .Mime)}}</span>{{end}}
+            <span class="grow"><span class="list-title">{{.Filename}}</span><span class="meta"><span>{{size .Size}}</span><span>{{ago .CreatedAt}}</span></span></span>
+          </a>
+          <a class="icon-btn" href="{{atturl .}}?download=1" title="Download" aria-label="Download">{{icon "download"}}</a>
+          {{template "itemmenu" (dict "Kind" "file" "ID" .ID "Name" .Filename "Flat" $flat "CSRF" $csrf "Back" $here)}}
+        </div>
+        {{end}}
+      </div>
+      {{else}}
+      <div class="empty">{{icon "folder"}}<p>This folder is empty. Create a note or a folder, or drop files here to upload.</p></div>
+      {{end}}
+      <p class="drop-hint">{{icon "upload"}} Drop files anywhere here to upload (max {{.MaxMB}} MB each)</p>
+    </div>
+  </div>
+
+  <aside class="rail">
+    <div class="rail-section">
+      <div class="section-label">Folders</div>
+      <nav class="tree">
+        <a class="tree-link {{if not $cur}}active{{end}}" href="/notes">{{icon "home"}}<span>Top level</span></a>
+        {{template "foldertree" (dict "Nodes" .Tree "Cur" $cur)}}
+      </nav>
+    </div>
+  </aside>
+</div>
+{{end}}

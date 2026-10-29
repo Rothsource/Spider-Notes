@@ -141,15 +141,139 @@
     ta.dispatchEvent(new Event("input", { bubbles: true }));
   });
 
-  // ---- tick Markdown checkboxes inside rendered memos ----
+  // ---- tick Markdown checkboxes inside rendered memos and notes ----
   document.addEventListener("click", function (e) {
     var cb = e.target;
-    if (!cb.matches || !cb.matches(".memo-body input[type=checkbox][data-cb]")) return;
-    var card = cb.closest("[data-memo]");
-    if (!card || !window.htmx) return;
+    if (!cb.matches || !cb.matches("[data-toggle-base] input[type=checkbox][data-cb]")) return;
+    var body = cb.closest("[data-toggle-base]");
+    var target = cb.closest("[data-memo]") || body;
+    if (!target.id || !window.htmx) return;
     e.preventDefault();
-    htmx.ajax("POST", "/memos/" + card.getAttribute("data-memo") + "/toggle?idx=" + cb.getAttribute("data-cb"),
-      { target: "#" + card.id, swap: "outerHTML" });
+    htmx.ajax("POST", body.getAttribute("data-toggle-base") + "?idx=" + cb.getAttribute("data-cb"),
+      { target: "#" + target.id, swap: "outerHTML" });
+  });
+
+  // ---- file uploads into editors (📎 button, drag & drop, paste) ----
+  function insertAtCursor(ta, text) {
+    var s = ta.selectionStart, en = ta.selectionEnd, v = ta.value;
+    var pre = s > 0 && v[s - 1] !== "\n" ? "\n" : "";
+    ta.value = v.slice(0, s) + pre + text + v.slice(en);
+    var c = s + pre.length + text.length;
+    ta.setSelectionRange(c, c);
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  function uploadInto(form, files) {
+    var ta = form.querySelector("textarea");
+    if (!ta || !files || !files.length) return;
+    Array.prototype.forEach.call(files, function (file) {
+      var marker = "[Uploading " + file.name.replace(/[\[\]]/g, "") + "…]";
+      insertAtCursor(ta, marker + "\n");
+      var fd = new FormData();
+      fd.append("file", file, file.name || "pasted-image.png");
+      if (form.dataset.owner && form.dataset.ownerId) fd.append(form.dataset.owner, form.dataset.ownerId);
+      fetch("/attachments/upload", { method: "POST", body: fd, headers: { "X-CSRF-Token": token }, credentials: "same-origin" })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) {
+          if (!res.ok) throw new Error(res.j.error || "Upload failed");
+          ta.value = ta.value.replace(marker, res.j.markdown);
+          ta.dispatchEvent(new Event("input", { bubbles: true }));
+          toast("Attached " + res.j.filename);
+        })
+        .catch(function (err) {
+          ta.value = ta.value.replace(marker + "\n", "");
+          ta.dispatchEvent(new Event("input", { bubbles: true }));
+          toast(err.message || "Upload failed", true);
+        });
+    });
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest("[data-upload]") : null;
+    if (!b) return;
+    var input = b.parentElement.querySelector("[data-upload-input]");
+    if (input) input.click();
+  });
+  document.addEventListener("change", function (e) {
+    var input = e.target;
+    if (!input.matches || !input.matches("[data-upload-input]")) return;
+    uploadInto(input.closest("form"), input.files);
+    input.value = "";
+  });
+  document.addEventListener("paste", function (e) {
+    var ta = e.target;
+    if (!ta.matches || !ta.matches("textarea.editor-input") || !e.clipboardData) return;
+    var files = e.clipboardData.files;
+    if (files && files.length) { e.preventDefault(); uploadInto(ta.form, files); }
+  });
+  document.addEventListener("dragover", function (e) {
+    var t = e.target.closest ? e.target.closest("textarea.editor-input, [data-dropzone]") : null;
+    if (t && e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types, "Files") >= 0) {
+      e.preventDefault();
+      t.classList.add("drag-over");
+    }
+  });
+  document.addEventListener("dragleave", function (e) {
+    var t = e.target.closest ? e.target.closest(".drag-over") : null;
+    if (t && !t.contains(e.relatedTarget)) t.classList.remove("drag-over");
+  });
+  document.addEventListener("drop", function (e) {
+    var t = e.target.closest ? e.target.closest("textarea.editor-input, [data-dropzone]") : null;
+    if (!t || !e.dataTransfer || !e.dataTransfer.files.length) return;
+    e.preventDefault();
+    t.classList.remove("drag-over");
+    if (t.matches("textarea")) { uploadInto(t.form, e.dataTransfer.files); return; }
+    // Folder page: hand the files to the upload form.
+    var form = document.querySelector(t.getAttribute("data-dropzone"));
+    var input = form && form.querySelector("input[type=file]");
+    if (input) { input.files = e.dataTransfer.files; form.requestSubmit(); toast("Uploading…"); }
+  });
+
+  // ---- rename prompts ----
+  document.addEventListener("submit", function (e) {
+    var f = e.target;
+    if (!f.matches || !f.matches("form[data-prompt]")) return;
+    var v = window.prompt(f.getAttribute("data-prompt"), f.getAttribute("data-prompt-value") || "");
+    if (v === null || v.trim() === "") { e.preventDefault(); return; }
+    f.querySelector("input[name=name]").value = v.trim();
+  }, true);
+
+  // ---- note editor: preview tab, Ctrl+S, unsaved-changes guard ----
+  var dirty = false;
+  document.addEventListener("input", function (e) {
+    if (e.target.closest && e.target.closest("#note-form")) dirty = true;
+  });
+  document.addEventListener("submit", function (e) {
+    if (e.target.id === "note-form") dirty = false;
+  });
+  window.addEventListener("beforeunload", function (e) {
+    if (dirty) { e.preventDefault(); e.returnValue = ""; }
+  });
+  document.addEventListener("click", function (e) {
+    var tab = e.target.closest ? e.target.closest("[data-note-tab]") : null;
+    if (!tab) return;
+    var form = tab.closest("form");
+    var ta = form.querySelector("textarea");
+    var pv = form.querySelector("[data-preview]");
+    form.querySelectorAll("[data-note-tab]").forEach(function (t) { t.classList.toggle("active", t === tab); });
+    if (tab.getAttribute("data-note-tab") === "preview") {
+      var fd = new FormData();
+      fd.append("content", ta.value);
+      fetch("/preview", { method: "POST", body: fd, headers: { "X-CSRF-Token": token }, credentials: "same-origin" })
+        .then(function (r) { return r.text(); })
+        .then(function (html) { pv.innerHTML = html || '<p class="muted">Nothing to preview.</p>'; ta.hidden = true; pv.hidden = false; });
+    } else {
+      pv.hidden = true; ta.hidden = false; ta.focus();
+    }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "s") return;
+    var form = document.querySelector("form[data-ctrl-s]");
+    if (!form) return;
+    e.preventDefault();
+    fetch(form.action, { method: "POST", body: new FormData(form), headers: { "HX-Request": "true" }, credentials: "same-origin" })
+      .then(function (r) {
+        if (r.ok) { dirty = false; toast("Saved"); } else { toast("Save failed", true); }
+      })
+      .catch(function () { toast("Network error, not saved", true); });
   });
 
   // ---- dropdown menus ----

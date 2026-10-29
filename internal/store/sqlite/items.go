@@ -80,12 +80,13 @@ func (d *DB) TagCounts(ctx context.Context, kind string) ([]model.TagCount, erro
 		"memo":     `SELECT tag_id FROM memo_tags x JOIN memos m ON m.id = x.memo_id WHERE m.deleted_at IS NULL`,
 		"task":     `SELECT tag_id FROM task_tags x JOIN tasks t ON t.id = x.task_id WHERE t.deleted_at IS NULL`,
 		"reminder": `SELECT tag_id FROM reminder_tags x JOIN reminders r ON r.id = x.reminder_id WHERE r.deleted_at IS NULL`,
+		"note":     `SELECT tag_id FROM note_tags x JOIN notes n ON n.id = x.note_id WHERE n.deleted_at IS NULL`,
 	}
 	var sub string
 	if p, ok := parts[kind]; ok {
 		sub = p
 	} else {
-		sub = parts["memo"] + " UNION ALL " + parts["task"] + " UNION ALL " + parts["reminder"]
+		sub = parts["memo"] + " UNION ALL " + parts["task"] + " UNION ALL " + parts["reminder"] + " UNION ALL " + parts["note"]
 	}
 	rows, err := d.q.QueryContext(ctx, `SELECT g.name, COUNT(*) FROM (`+sub+`) u JOIN tags g ON g.id = u.tag_id GROUP BY g.name ORDER BY COUNT(*) DESC, g.name`)
 	if err != nil {

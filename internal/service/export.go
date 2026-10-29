@@ -2,13 +2,14 @@ package service
 
 import (
 	"archive/zip"
-	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -109,34 +110,218 @@ func (s *Service) BuildExport(ctx context.Context) (map[string][]byte, error) {
 		}
 	}
 	files["tasks.md"] = []byte(b.String())
+
+	// notes/<folder path>/<title>.md
+	notes, err := s.st.ListNotes(ctx, 0, true)
+	if err != nil {
+		return nil, err
+	}
+	paths, err := s.folderPaths(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, n := range notes {
+		dir := "notes"
+		if n.FolderID != nil {
+			dir += "/" + paths[*n.FolderID]
+		}
+		name := uniqueName(files, dir+"/"+safeSegment(n.Title), ".md")
+		files[name] = []byte("# " + n.Title + "\n\n" + strings.TrimSpace(n.ContentMD) + "\n")
+	}
 	return files, nil
 }
 
-// ExportToDir writes the Markdown export to the configured directory.
+// folderPaths maps folder id -> "A/B/C" using filesystem-safe names.
+func (s *Service) folderPaths(ctx context.Context) (map[int64]string, error) {
+	all, err := s.st.ListFolders(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byID := map[int64]model.Folder{}
+	for _, f := range all {
+		byID[f.ID] = f
+	}
+	out := map[int64]string{}
+	for _, f := range all {
+		var parts []string
+		cur, ok := f, true
+		for i := 0; ok && i <= maxFolderDeep; i++ {
+			parts = append([]string{safeSegment(cur.Name)}, parts...)
+			if cur.ParentID == nil {
+				break
+			}
+			cur, ok = byID[*cur.ParentID]
+		}
+		out[f.ID] = strings.Join(parts, "/")
+	}
+	return out, nil
+}
+
+func safeSegment(s string) string {
+	s = strings.Map(func(r rune) rune {
+		if strings.ContainsRune(`<>:"/\|?*`, r) || r < 32 {
+			return '_'
+		}
+		return r
+	}, strings.TrimSpace(s))
+	s = strings.Trim(s, ". ")
+	if s == "" {
+		s = "untitled"
+	}
+	return s
+}
+
+func uniqueName(taken map[string][]byte, base, ext string) string {
+	name := base + ext
+	for i := 2; ; i++ {
+		if _, ok := taken[name]; !ok {
+			return name
+		}
+		name = fmt.Sprintf("%s (%d)%s", base, i, ext)
+	}
+}
+
+type exportFile struct {
+	path string
+	att  model.Attachment
+}
+
+// exportAttachments lists uploaded files: folder files keep their folder path,
+// memo/note attachments go to attachments/<id>-<name>.
+func (s *Service) exportAttachments(ctx context.Context) ([]exportFile, error) {
+	paths, err := s.folderPaths(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out []exportFile
+	seen := map[string][]byte{}
+	add := func(list []model.Attachment, dirFor func(a model.Attachment) string) {
+		for _, a := range list {
+			dir := dirFor(a)
+			ext := filepath.Ext(a.Filename)
+			p := uniqueName(seen, dir+"/"+safeSegment(strings.TrimSuffix(a.Filename, ext)), ext)
+			seen[p] = nil
+			out = append(out, exportFile{path: p, att: a})
+		}
+	}
+	top, err := s.st.ListAttachments(ctx, model.AttachmentFilter{InFolder: true, FolderID: 0, Limit: 5000})
+	if err != nil {
+		return nil, err
+	}
+	add(top, func(model.Attachment) string { return "files" })
+	for id, p := range paths {
+		list, err := s.st.ListAttachments(ctx, model.AttachmentFilter{InFolder: true, FolderID: id, Limit: 5000})
+		if err != nil {
+			return nil, err
+		}
+		dir := "files/" + p
+		add(list, func(model.Attachment) string { return dir })
+	}
+	for _, kind := range []string{"memo", "note"} {
+		owned, err := s.ownedAttachments(ctx, kind)
+		if err != nil {
+			return nil, err
+		}
+		add(owned, func(a model.Attachment) string { return "attachments/" + strconv.FormatInt(a.ID, 10) })
+	}
+	return out, nil
+}
+
+func (s *Service) ownedAttachments(ctx context.Context, kind string) ([]model.Attachment, error) {
+	var out []model.Attachment
+	if kind == "memo" {
+		memos, err := s.st.ListMemos(ctx, model.MemoFilter{Limit: 5000}, false)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range memos {
+			l, err := s.st.ListAttachments(ctx, model.AttachmentFilter{MemoID: m.ID})
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, l...)
+		}
+		return out, nil
+	}
+	notes, err := s.st.ListNotes(ctx, 0, true)
+	if err != nil {
+		return nil, err
+	}
+	for _, n := range notes {
+		l, err := s.st.ListAttachments(ctx, model.AttachmentFilter{NoteID: n.ID})
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, l...)
+	}
+	return out, nil
+}
+
+func (s *Service) copyAttachment(ctx context.Context, a model.Attachment, w io.Writer) error {
+	_, f, err := s.OpenAttachment(ctx, a.ID)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = io.Copy(w, f)
+	return err
+}
+
+// ExportToDir writes the Markdown export (and uploaded files) to the export directory.
 func (s *Service) ExportToDir(ctx context.Context) (int, error) {
 	files, err := s.BuildExport(ctx)
 	if err != nil {
 		return 0, err
 	}
-	for name, data := range files {
+	write := func(name string, fn func(io.Writer) error) error {
 		p := filepath.Join(s.exportDir, filepath.FromSlash(name))
 		if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
-			return 0, err
+			return err
 		}
 		tmp := p + ".tmp"
-		if err := os.WriteFile(tmp, data, 0o640); err != nil {
-			return 0, err
+		f, err := os.Create(tmp) //nolint:gosec // path built from sanitized segments under exportDir
+		if err != nil {
+			return err
 		}
-		if err := os.Rename(tmp, p); err != nil {
+		if err := fn(f); err != nil {
+			f.Close()
+			return err
+		}
+		if err := f.Close(); err != nil {
+			return err
+		}
+		return os.Rename(tmp, p)
+	}
+	for name, data := range files {
+		if err := write(name, func(w io.Writer) error { _, err := w.Write(data); return err }); err != nil {
 			return 0, err
 		}
 	}
-	return len(files), nil
+	atts, err := s.exportAttachments(ctx)
+	if err != nil {
+		return 0, err
+	}
+	n := len(files)
+	for _, ef := range atts {
+		err := write(ef.path, func(w io.Writer) error { return s.copyAttachment(ctx, ef.att, w) })
+		if errors.Is(err, model.ErrNotFound) {
+			continue // file missing on disk: skip
+		}
+		if err != nil {
+			return 0, err
+		}
+		n++
+	}
+	return n, nil
 }
 
-// ExportZip writes the export as a zip archive.
+// ExportZip streams the export (with uploaded files) as a zip archive.
 func (s *Service) ExportZip(ctx context.Context, w io.Writer) error {
 	files, err := s.BuildExport(ctx)
+	if err != nil {
+		return err
+	}
+	atts, err := s.exportAttachments(ctx)
 	if err != nil {
 		return err
 	}
@@ -145,8 +330,7 @@ func (s *Service) ExportZip(ctx context.Context, w io.Writer) error {
 		names = append(names, n)
 	}
 	sort.Strings(names)
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
+	zw := zip.NewWriter(w)
 	for _, n := range names {
 		f, err := zw.CreateHeader(&zip.FileHeader{Name: n, Method: zip.Deflate, Modified: s.Now()})
 		if err != nil {
@@ -156,11 +340,16 @@ func (s *Service) ExportZip(ctx context.Context, w io.Writer) error {
 			return err
 		}
 	}
-	if err := zw.Close(); err != nil {
-		return err
+	for _, ef := range atts {
+		f, err := zw.CreateHeader(&zip.FileHeader{Name: ef.path, Method: zip.Deflate, Modified: ef.att.UpdatedAt})
+		if err != nil {
+			return err
+		}
+		if err := s.copyAttachment(ctx, ef.att, f); err != nil && !errors.Is(err, model.ErrNotFound) {
+			return err
+		}
 	}
-	_, err = w.Write(buf.Bytes())
-	return err
+	return zw.Close()
 }
 
 // MaybeAutoExport runs the daily export once per day after the configured time.

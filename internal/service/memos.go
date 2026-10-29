@@ -34,7 +34,10 @@ func (s *Service) CreateMemo(ctx context.Context, content string) (*model.Memo, 
 		if err := tx.CreateMemo(ctx, m); err != nil {
 			return err
 		}
-		return tx.SetMemoTags(ctx, m.ID, m.Tags)
+		if err := tx.SetMemoTags(ctx, m.ID, m.Tags); err != nil {
+			return err
+		}
+		return s.linkAttachments(ctx, tx, m.ContentMD, m.ID, 0)
 	})
 	return m, err
 }
@@ -86,7 +89,10 @@ func (s *Service) modifyMemo(ctx context.Context, id int64, fn func(*model.Memo)
 		if err := tx.UpdateMemo(ctx, m); err != nil {
 			return err
 		}
-		return tx.SetMemoTags(ctx, m.ID, m.Tags)
+		if err := tx.SetMemoTags(ctx, m.ID, m.Tags); err != nil {
+			return err
+		}
+		return s.linkAttachments(ctx, tx, m.ContentMD, m.ID, 0)
 	})
 	return m, err
 }

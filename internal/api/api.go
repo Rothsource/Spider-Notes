@@ -67,6 +67,7 @@ func Register(mux *http.ServeMux, svc *service.Service, am *auth.Manager) {
 	h("GET "+p+"/history", a.history)
 	h("GET "+p+"/stats", a.stats)
 	h("GET "+p+"/search", a.search)
+	a.registerNotes(h, protect, mux)
 	mux.Handle(p+"/", protect(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "unknown endpoint")
 	})))
@@ -143,6 +144,13 @@ func pathID(r *http.Request) (int64, error) {
 	}
 	return id, nil
 }
+
+func formInt(r *http.Request, k string) int64 {
+	n, _ := strconv.ParseInt(r.FormValue(k), 10, 64)
+	return n
+}
+
+func itoa(n int64) string { return strconv.FormatInt(n, 10) }
 
 func queryInt(r *http.Request, k string) int64 {
 	n, _ := strconv.ParseInt(r.URL.Query().Get(k), 10, 64)

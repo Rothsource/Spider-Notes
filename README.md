@@ -18,7 +18,9 @@ It is a single Go binary with SQLite, a server-rendered web UI (htmx), and a
 | **Tasks** | Create/edit/delete tasks with Markdown description, due date, priority, tags and repeat rules (daily / every N days, weekly on chosen weekdays, monthly on day D). Filter by pending/done/all, today/this week/overdue/no date, tag, priority, and text search. Click the circle to complete. A repeating task records the completion and moves to its next occurrence. |
 | **Reminders** | Standalone or attached to a task. One-time, or repeating: daily at HH:MM, on weekdays, monthly on day D (31 means "last day" in short months), every N hours/minutes with an optional active window, with an end date or max count. Options: **nag mode** (re-send every N minutes until Done/Snooze), per-reminder quiet-hours override, "ignore quiet hours", pause/resume. Each reminder shows its history. |
 | **Calendar** | Month and week (hourly grid) views with prev/next/today. Tasks and reminders have different colours, and overdue, done, skipped, missed and paused items look different. Repeating items appear on every day they occur. A ● marks days with memos. Click a day to open a side panel with everything on it and buttons to add a task or reminder for that date. |
-| **Memos** | Memos-app style capture: type and press **Enter** (Shift+Enter for a new line). Timeline grouped by day with infinite scroll. Markdown (GFM, sanitized), clickable `- [ ]` checkboxes, `#tags` parsed automatically with a tag sidebar, search, pin, edit, delete. |
+| **Spider Notes** (memo timeline) | Memos-app style capture: type and press **Enter** (Shift+Enter for a new line). Timeline grouped by day with infinite scroll. Markdown (GFM, sanitized), clickable `- [ ]` checkboxes, `#tags` parsed automatically with a tag sidebar, search, pin, edit, delete. |
+| **Folders** | A small file manager for longer notes and files. Create nested folders, titled Markdown notes (Write/Preview, Ctrl+S to save, clickable checkboxes, #tags) and upload any file (drag and drop works). Every folder, note and file can be renamed, moved or deleted from its `⋯` menu. Deleting a folder deletes everything inside it. Images and PDFs open in the browser; other types download. |
+| **Attachments** | In any memo or note editor, use 📎, drag and drop, or paste a screenshot to attach a file. Images appear inline. |
 | **History** | Everything done, skipped or missed, by day/week/month, filterable by type, outcome and tag. Shows the completion rate per reminder/task over the last 7 and 30 days. |
 | **Search** | Full-text search (SQLite FTS5) across memos, tasks and reminders. |
 | **Settings** | Global quiet hours, the "snooze until tomorrow morning" time, default nag interval, daily auto-export, Telegram token/chat ID with a **Send test message** button, Markdown export and .zip download, change password, API tokens. |
@@ -91,6 +93,8 @@ All settings are environment variables (see `.env.example`).
 | `TELEGRAM_CHAT_ID` | (empty) | The only chat that receives messages and may press buttons |
 | `APP_SCHEDULER_INTERVAL` | `30s` | How often due reminders are checked |
 | `APP_EXPORT_DIR` | `/data/export` | Markdown export location |
+| `APP_ATTACHMENTS_DIR` | `/data/attachments` | Uploaded files (stored under random names) |
+| `APP_MAX_UPLOAD_MB` | `50` | Maximum size of one uploaded file |
 | `APP_TRUST_PROXY` | `false` | Trust `X-Forwarded-For` / `X-Forwarded-Proto` from a reverse proxy |
 | `APP_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` (JSON logs to stdout) |
 
@@ -139,6 +143,12 @@ docker compose start app
 
 (If the copied file ends up owned by root, run `docker compose run --rm --user root --entrypoint /bin/sh app` with an image that has a shell, or restore into the volume with a helper container such as `docker run --rm -v spider-notes_spider-notes-data:/data -v $PWD:/b alpine sh -c "cp /b/backup.db /data/app.db && chown 65532:65532 /data/app.db && rm -f /data/app.db-wal /data/app.db-shm"`.)
 
+**Uploaded files** live in `/data/attachments`, not in the database, so back them up too:
+
+```bash
+docker compose cp app:/data/attachments ./attachments-backup
+```
+
 Back up the `.env` file too: it holds the session secret and the initial credentials.
 
 ## Markdown export
@@ -149,6 +159,9 @@ Back up the `.env` file too: it holds the session secret and the initial credent
 memos/YYYY-MM-DD.md     that day's memos, each under "## HH:MM", tags kept
 history/YYYY-MM-DD.md   checklist of what was done / skipped / missed that day, with times
 tasks.md                current open tasks
+notes/<folder path>/<title>.md   every note, keeping the folder structure
+files/<folder path>/<file>       files uploaded into folders
+attachments/<id>/<file>          files attached to memos and notes
 ```
 
 **Download .zip** gives the same files in one archive. The database stays the
@@ -207,7 +220,8 @@ curl -H "$H" "http://localhost:8080/api/v1/calendar?from=2026-11-01&to=2026-12-0
 curl -H "$H" "http://localhost:8080/api/v1/history?from=2026-10-01"
 ```
 
-Endpoints: `tasks` (CRUD, `complete`, `uncomplete`, `skip`), `reminders` (CRUD,
+Endpoints: `folders` (list, create, contents, rename/move, delete), `notes` (CRUD, move, pin),
+`attachments` (multipart upload, list, metadata, `/{id}/content` download, delete), `tasks` (CRUD, `complete`, `uncomplete`, `skip`), `reminders` (CRUD,
 `pause`, `resume`), `occurrences` (list, `done`, `snooze`, `skip`), `memos`
 (CRUD, `pin`, `unpin`, search with `q`), `tags`, `calendar`, `history`, `stats`, `search`.
 

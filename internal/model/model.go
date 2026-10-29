@@ -154,6 +154,65 @@ type Memo struct {
 	Tags      []string   `json:"tags"`
 }
 
+// Folder groups notes and files. ParentID nil = top level.
+type Folder struct {
+	ID        int64      `json:"id"`
+	ParentID  *int64     `json:"parent_id"`
+	Name      string     `json:"name"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+}
+
+// Note is a titled Markdown document inside a folder (FolderID nil = top level).
+type Note struct {
+	ID        int64      `json:"id"`
+	FolderID  *int64     `json:"folder_id"`
+	Title     string     `json:"title"`
+	ContentMD string     `json:"content_md"`
+	Pinned    bool       `json:"pinned"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	Tags      []string   `json:"tags"`
+}
+
+// Attachment is an uploaded file stored on disk. It lives in a folder or
+// belongs to a memo or note.
+type Attachment struct {
+	ID         int64      `json:"id"`
+	FolderID   *int64     `json:"folder_id"`
+	MemoID     *int64     `json:"memo_id"`
+	NoteID     *int64     `json:"note_id"`
+	Filename   string     `json:"filename"`
+	Mime       string     `json:"mime"`
+	Size       int64      `json:"size"`
+	SHA256     string     `json:"sha256"`
+	StorageKey string     `json:"-"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
+	DeletedAt  *time.Time `json:"deleted_at,omitempty"`
+}
+
+// IsImage reports whether the file can be shown inline as an image.
+func (a *Attachment) IsImage() bool {
+	switch a.Mime {
+	case "image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp":
+		return true
+	}
+	return false
+}
+
+// AttachmentFilter selects attachments. With InFolder set, FolderID selects the
+// folder's own files (0 = top-level files that belong to no memo or note).
+type AttachmentFilter struct {
+	InFolder bool
+	FolderID int64
+	MemoID   int64
+	NoteID   int64
+	Limit    int
+}
+
 // TagCount is a tag with usage count.
 type TagCount struct {
 	Name  string `json:"name"`
