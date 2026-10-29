@@ -1,0 +1,49 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="{{.CSRF}}">
+<meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false}'>
+<meta name="color-scheme" content="light dark">
+<title>{{.Title}} · Mynotes</title>
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/theme.js"></script>
+<script src="/static/htmx.min.js" defer></script>
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+{{if .CSRF}}
+<header class="topbar">
+  <a class="brand" href="/">📝 Mynotes</a>
+  <nav class="nav">
+    <a href="/" {{if eq .Path "/"}}class="active"{{end}}>Today</a>
+    <a href="/tasks" {{if eq .Path "/tasks"}}class="active"{{end}}>Tasks</a>
+    <a href="/reminders" {{if eq .Path "/reminders"}}class="active"{{end}}>Reminders</a>
+    <a href="/calendar" {{if eq .Path "/calendar"}}class="active"{{end}}>Calendar</a>
+    <a href="/memos" {{if eq .Path "/memos"}}class="active"{{end}}>Memos</a>
+    <a href="/history" {{if eq .Path "/history"}}class="active"{{end}}>History</a>
+  </nav>
+  <form class="search" action="/search" method="get" role="search">
+    <input type="search" name="q" placeholder="Search…" aria-label="Search" value="{{if eq .Path "/search"}}{{.Q}}{{end}}">
+  </form>
+  <div class="topbar-right">
+    <button type="button" class="icon-btn" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">◐</button>
+    <a href="/settings" class="icon-btn {{if eq .Path "/settings"}}active{{end}}" title="Settings" aria-label="Settings">⚙</a>
+    <form method="post" action="/logout" class="inline">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <button class="icon-btn" title="Log out" aria-label="Log out">⎋</button>
+    </form>
+  </div>
+</header>
+{{end}}
+<main class="container">
+  {{with .Msg}}<div class="flash ok" role="status">{{.}}</div>{{end}}
+  {{with .Error}}<div class="flash err" role="alert">{{.}}</div>{{end}}
+  {{template "content" .}}
+</main>
+{{if .CSRF}}<footer class="footer">Times in {{.TZ}} · {{.Version}}</footer>{{end}}
+<div id="toast" class="toast" hidden></div>
+</body>
+</html>{{end}}

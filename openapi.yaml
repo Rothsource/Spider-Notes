@@ -1,0 +1,575 @@
+openapi: 3.1.0
+info:
+  title: Mynotes API
+  version: "1.0"
+  description: |
+    Personal tasks, reminders, calendar and memos.
+
+    Authentication: send a personal API token (create it in Settings) as
+    `Authorization: Bearer mnt_...`. The web UI uses the session cookie and
+    must also send `X-CSRF-Token` on state-changing requests.
+
+    Timestamps are RFC 3339 with the server time-zone offset (default
+    Asia/Phnom_Penh, +07:00). Query parameters `from`/`to` accept RFC 3339
+    or `YYYY-MM-DD` (local midnight). Errors always look like
+    `{"error": {"code": "validation", "message": "..."}}`.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+
+tags:
+  - name: tasks
+  - name: reminders
+  - name: occurrences
+  - name: memos
+  - name: views
+
+paths:
+  /tasks:
+    get:
+      tags: [tasks]
+      operationId: listTasks
+      summary: List tasks
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [pending, done, all], default: pending } }
+        - { name: range, in: query, schema: { type: string, enum: [today, week, overdue, nodate] } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: priority, in: query, schema: { $ref: "#/components/schemas/Priority" } }
+        - { name: q, in: query, description: Full-text search, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 1000 } }
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks: { type: array, items: { $ref: "#/components/schemas/Task" } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [tasks]
+      operationId: createTask
+      summary: Create a task
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TaskInput" } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Task" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /tasks/{id}:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    get:
+      tags: [tasks]
+      operationId: getTask
+      summary: Get a task
+      responses:
+        "200": { description: Task, content: { application/json: { schema: { $ref: "#/components/schemas/Task" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      tags: [tasks]
+      operationId: updateTask
+      summary: Replace a task's editable fields
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TaskInput" } } } }
+      responses:
+        "200": { description: Task, content: { application/json: { schema: { $ref: "#/components/schemas/Task" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [tasks]
+      operationId: deleteTask
+      summary: Soft-delete a task (history is kept, attached reminders are deleted)
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /tasks/{id}/complete:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    post:
+      tags: [tasks]
+      operationId: completeTask
+      summary: Mark done (repeating tasks advance to the next occurrence)
+      responses:
+        "200": { description: Task, content: { application/json: { schema: { $ref: "#/components/schemas/Task" } } } }
+        "409": { $ref: "#/components/responses/Error" }
+        default: { $ref: "#/components/responses/Error" }
+  /tasks/{id}/uncomplete:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    post:
+      tags: [tasks]
+      operationId: uncompleteTask
+      summary: Reopen a completed task
+      responses:
+        "200": { description: Task, content: { application/json: { schema: { $ref: "#/components/schemas/Task" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /tasks/{id}/skip:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    post:
+      tags: [tasks]
+      operationId: skipTask
+      summary: Skip the current occurrence of a repeating task
+      responses:
+        "200": { description: Task, content: { application/json: { schema: { $ref: "#/components/schemas/Task" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  /reminders:
+    get:
+      tags: [reminders]
+      operationId: listReminders
+      summary: List reminders
+      parameters:
+        - { name: task_id, in: query, description: Only reminders attached to this task, schema: { type: integer } }
+      responses:
+        "200":
+          description: Reminders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reminders: { type: array, items: { $ref: "#/components/schemas/Reminder" } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [reminders]
+      operationId: createReminder
+      summary: Create a reminder
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ReminderInput" } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Reminder" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /reminders/{id}:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    get:
+      tags: [reminders]
+      operationId: getReminder
+      summary: Get a reminder
+      responses:
+        "200": { description: Reminder, content: { application/json: { schema: { $ref: "#/components/schemas/Reminder" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      tags: [reminders]
+      operationId: updateReminder
+      summary: Replace a reminder (schedule changes recompute next_fire_at)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ReminderInput" } } } }
+      responses:
+        "200": { description: Reminder, content: { application/json: { schema: { $ref: "#/components/schemas/Reminder" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [reminders]
+      operationId: deleteReminder
+      summary: Soft-delete a reminder (history is kept)
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /reminders/{id}/pause:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    post:
+      tags: [reminders]
+      operationId: pauseReminder
+      summary: Pause
+      responses:
+        "200": { description: Reminder, content: { application/json: { schema: { $ref: "#/components/schemas/Reminder" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /reminders/{id}/resume:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    post:
+      tags: [reminders]
+      operationId: resumeReminder
+      summary: Resume (schedules from now; occurrences missed while paused are not sent)
+      responses:
+        "200": { description: Reminder, content: { application/json: { schema: { $ref: "#/components/schemas/Reminder" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  /occurrences:
+    get:
+      tags: [occurrences]
+      operationId: listOccurrences
+      summary: List occurrences (each firing of a reminder / due instance of a task)
+      parameters:
+        - { $ref: "#/components/parameters/From" }
+        - { $ref: "#/components/parameters/To" }
+        - { name: status, in: query, description: "Comma separated, e.g. sent,snoozed", schema: { type: string } }
+        - { name: kind, in: query, schema: { type: string, enum: [reminder, task] } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: reminder_id, in: query, schema: { type: integer } }
+        - { name: task_id, in: query, schema: { type: integer } }
+        - { name: limit, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Occurrences
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  occurrences: { type: array, items: { $ref: "#/components/schemas/Occurrence" } }
+        default: { $ref: "#/components/responses/Error" }
+  /occurrences/{id}:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    get:
+      tags: [occurrences]
+      operationId: getOccurrence
+      summary: Get an occurrence
+      responses:
+        "200": { description: Occurrence, content: { application/json: { schema: { $ref: "#/components/schemas/Occurrence" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /occurrences/{id}/done:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    post:
+      tags: [occurrences]
+      operationId: markOccurrenceDone
+      summary: Mark done (stops nags; edits the Telegram message)
+      responses:
+        "200": { description: Occurrence, content: { application/json: { schema: { $ref: "#/components/schemas/Occurrence" } } } }
+        "409": { $ref: "#/components/responses/Error" }
+        default: { $ref: "#/components/responses/Error" }
+  /occurrences/{id}/snooze:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    post:
+      tags: [occurrences]
+      operationId: snoozeOccurrence
+      summary: Snooze (10, 30 or 60 minutes, or until tomorrow morning)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                minutes: { type: integer, enum: [10, 30, 60], default: 10 }
+                until: { type: string, enum: [morning] }
+      responses:
+        "200": { description: Occurrence, content: { application/json: { schema: { $ref: "#/components/schemas/Occurrence" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /occurrences/{id}/skip:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    post:
+      tags: [occurrences]
+      operationId: skipOccurrence
+      summary: Skip (repeating items only)
+      responses:
+        "200": { description: Occurrence, content: { application/json: { schema: { $ref: "#/components/schemas/Occurrence" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  /memos:
+    get:
+      tags: [memos]
+      operationId: listMemos
+      summary: List memos, newest first (cursor pagination)
+      parameters:
+        - { name: q, in: query, description: Full-text search, schema: { type: string } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: before, in: query, description: Memo id cursor (use next_before from the previous page), schema: { type: integer } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Memos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  memos: { type: array, items: { $ref: "#/components/schemas/Memo" } }
+                  next_before: { type: integer }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [memos]
+      operationId: createMemo
+      summary: Create a memo (#tags are parsed from the text)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MemoInput" } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Memo" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /memos/{id}:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    get:
+      tags: [memos]
+      operationId: getMemo
+      summary: Get a memo
+      responses:
+        "200": { description: Memo, content: { application/json: { schema: { $ref: "#/components/schemas/Memo" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      tags: [memos]
+      operationId: updateMemo
+      summary: Edit a memo
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MemoInput" } } } }
+      responses:
+        "200": { description: Memo, content: { application/json: { schema: { $ref: "#/components/schemas/Memo" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [memos]
+      operationId: deleteMemo
+      summary: Soft-delete a memo
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /memos/{id}/pin:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    post:
+      tags: [memos]
+      operationId: pinMemo
+      summary: Pin
+      responses:
+        "200": { description: Memo, content: { application/json: { schema: { $ref: "#/components/schemas/Memo" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /memos/{id}/unpin:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    post:
+      tags: [memos]
+      operationId: unpinMemo
+      summary: Unpin
+      responses:
+        "200": { description: Memo, content: { application/json: { schema: { $ref: "#/components/schemas/Memo" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  /tags:
+    get:
+      tags: [views]
+      operationId: listTags
+      summary: Tags with usage counts
+      parameters:
+        - { name: kind, in: query, schema: { type: string, enum: [memo, task, reminder] } }
+      responses:
+        "200":
+          description: Tags
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tags:
+                    type: array
+                    items: { type: object, properties: { name: { type: string }, count: { type: integer } } }
+        default: { $ref: "#/components/responses/Error" }
+  /calendar:
+    get:
+      tags: [views]
+      operationId: getCalendar
+      summary: Expanded calendar items (repeating items appear on every day they occur), max 100 days
+      parameters:
+        - { $ref: "#/components/parameters/From" }
+        - { $ref: "#/components/parameters/To" }
+      responses:
+        "200": { description: Calendar, content: { application/json: { schema: { $ref: "#/components/schemas/Calendar" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /history:
+    get:
+      tags: [views]
+      operationId: getHistory
+      summary: Done, skipped and missed occurrences
+      parameters:
+        - { $ref: "#/components/parameters/From" }
+        - { $ref: "#/components/parameters/To" }
+        - { name: kind, in: query, schema: { type: string, enum: [reminder, task] } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string, enum: [done, skipped, missed] } }
+      responses:
+        "200":
+          description: History
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  history: { type: array, items: { $ref: "#/components/schemas/Occurrence" } }
+        default: { $ref: "#/components/responses/Error" }
+  /stats:
+    get:
+      tags: [views]
+      operationId: getStats
+      summary: Completion rate per reminder/task over the last 7 and 30 days
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stats:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        kind: { type: string }
+                        id: { type: integer }
+                        title: { type: string }
+                        done_7: { type: integer }
+                        total_7: { type: integer }
+                        rate_7: { type: number }
+                        done_30: { type: integer }
+                        total_30: { type: integer }
+                        rate_30: { type: number }
+        default: { $ref: "#/components/responses/Error" }
+  /search:
+    get:
+      tags: [views]
+      operationId: search
+      summary: Full-text search across memos, tasks and reminders (prefix match on every word)
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 200 } }
+      responses:
+        "200":
+          description: Results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        kind: { type: string, enum: [memo, task, reminder] }
+                        id: { type: integer }
+                        title: { type: string }
+                        snippet: { type: string }
+                        when: { type: string, format: date-time }
+        default: { $ref: "#/components/responses/Error" }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, description: "Personal API token (mnt_...)" }
+    cookieAuth: { type: apiKey, in: cookie, name: mn_session }
+  parameters:
+    ID: { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    From: { name: from, in: query, description: "RFC 3339 or YYYY-MM-DD", schema: { type: string } }
+    To: { name: to, in: query, description: "RFC 3339 or YYYY-MM-DD (exclusive)", schema: { type: string } }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  code: { type: string, enum: [validation, not_found, conflict, unauthorized, csrf, internal] }
+                  message: { type: string }
+  schemas:
+    Priority: { type: string, enum: [low, normal, high] }
+    Repeat:
+      type: object
+      description: Structured repeat rule (stored as an RFC 5545 RRULE).
+      required: [freq]
+      properties:
+        freq: { type: string, enum: [daily, weekly, monthly, hourly, minutely] }
+        interval: { type: integer, minimum: 1, description: "Every N days/weeks/months/hours/minutes (minutely: >= 5)" }
+        weekdays: { type: array, items: { type: integer, minimum: 0, maximum: 6 }, description: "0=Sunday..6=Saturday (weekly)" }
+        month_day: { type: integer, minimum: 1, maximum: 31, description: "Monthly; 29-31 fall back to the last day of shorter months" }
+        time: { type: string, example: "08:00", description: "HH:MM for daily/weekly/monthly reminders (tasks use the due time)" }
+        window: { type: string, example: "08:00-20:00", description: "Active window for hourly/minutely (end inclusive)" }
+        until: { type: string, format: date, description: "Last day (inclusive)" }
+        count: { type: integer, minimum: 0, description: "Maximum number of occurrences (0 = unlimited)" }
+    TaskInput:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, maxLength: 300 }
+        description_md: { type: string, maxLength: 20000 }
+        due_at: { type: [string, "null"], format: date-time }
+        priority: { $ref: "#/components/schemas/Priority" }
+        tags: { type: array, items: { type: string } }
+        repeat: { oneOf: [ { $ref: "#/components/schemas/Repeat" }, { type: "null" } ], description: "daily/weekly/monthly only; requires due_at" }
+    Task:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        description_md: { type: string }
+        due_at: { type: [string, "null"], format: date-time }
+        priority: { $ref: "#/components/schemas/Priority" }
+        status: { type: string, enum: [pending, done] }
+        repeat_rule: { type: string, description: RRULE }
+        repeat: { oneOf: [ { $ref: "#/components/schemas/Repeat" }, { type: "null" } ] }
+        repeat_description: { type: string }
+        completed_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        tags: { type: array, items: { type: string } }
+    ReminderInput:
+      type: object
+      required: [fire_at]
+      properties:
+        message_md: { type: string, maxLength: 4000, description: "Required unless task_id is set" }
+        task_id: { type: [integer, "null"] }
+        fire_at: { type: string, format: date-time, description: "One-time: when to fire. Repeating: series start (first occurrence is the first match at or after it)" }
+        repeat: { oneOf: [ { $ref: "#/components/schemas/Repeat" }, { type: "null" } ], description: "null = one-time" }
+        nag_enabled: { type: boolean, description: "Re-send every nag_interval_min until done or snoozed" }
+        nag_interval_min: { type: integer, minimum: 1, maximum: 1440 }
+        quiet_hours_override: { type: string, description: "'' = global, 'off' = none, or 'HH:MM-HH:MM'" }
+        ignore_quiet_hours: { type: boolean }
+        enabled: { type: boolean, default: true }
+        tags: { type: array, items: { type: string } }
+    Reminder:
+      allOf:
+        - $ref: "#/components/schemas/ReminderInput"
+        - type: object
+          properties:
+            id: { type: integer }
+            task_title: { type: string }
+            schedule_type: { type: string, enum: [one_time, repeating] }
+            repeat_rule: { type: string }
+            active_window: { type: string }
+            repeat_description: { type: string }
+            timezone: { type: string }
+            next_fire_at: { type: [string, "null"], format: date-time }
+            last_sent_at: { type: [string, "null"], format: date-time }
+            fire_count: { type: integer }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    Occurrence:
+      type: object
+      properties:
+        id: { type: integer }
+        reminder_id: { type: [integer, "null"] }
+        task_id: { type: [integer, "null"] }
+        kind: { type: string, enum: [reminder, task] }
+        title: { type: string }
+        repeating: { type: boolean }
+        scheduled_for: { type: string, format: date-time }
+        status: { type: string, enum: [pending, sent, done, snoozed, skipped, missed] }
+        sent_count: { type: integer }
+        snooze_count: { type: integer }
+        snoozed_until: { type: [string, "null"], format: date-time }
+        next_send_at: { type: [string, "null"], format: date-time }
+        last_sent_at: { type: [string, "null"], format: date-time }
+        done_at: { type: [string, "null"], format: date-time }
+        action_source: { type: string, enum: ["", web, telegram, api, system] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    MemoInput:
+      type: object
+      required: [content_md]
+      properties:
+        content_md: { type: string, maxLength: 20000 }
+    Memo:
+      type: object
+      properties:
+        id: { type: integer }
+        content_md: { type: string }
+        pinned: { type: boolean }
+        tags: { type: array, items: { type: string } }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Calendar:
+      type: object
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        memo_days: { type: object, additionalProperties: { type: integer }, description: "YYYY-MM-DD -> memo count" }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              kind: { type: string, enum: [task, reminder] }
+              id: { type: integer }
+              occurrence_id: { type: integer }
+              title: { type: string }
+              at: { type: string, format: date-time }
+              status: { type: string, enum: [pending, overdue, upcoming, sent, snoozed, done, skipped, missed, paused] }
+              repeating: { type: boolean }
+              priority: { type: string }
+              count: { type: integer, description: ">1 when several sub-daily firings on one day are collapsed" }

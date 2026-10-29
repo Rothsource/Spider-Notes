@@ -1,0 +1,44 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>{{day .Now}}</h1>
+  {{if .Quiet}}<span class="badge">🌙 Quiet hours</span>{{end}}
+</div>
+
+<form class="quick-add card" method="post" action="/tasks">
+  <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+  <input type="hidden" name="back" value="/">
+  <input name="title" placeholder="Quick add a task…" required maxlength="300" aria-label="Task title">
+  <input name="due" type="datetime-local" aria-label="Due">
+  <button class="btn primary">Add</button>
+</form>
+
+<div class="grid-2">
+  <section>
+    <h2>Needs attention</h2>
+    {{range .Open}}{{template "occ" (dict "Data" . "CSRF" $.CSRF)}}{{else}}<p class="muted">No open reminders. 🎉</p>{{end}}
+
+    <h2>Overdue tasks</h2>
+    <ul class="task-list">
+      {{range .Overdue}}{{template "taskrow" (dict "Data" . "CSRF" $.CSRF)}}{{else}}<li class="muted empty">Nothing overdue.</li>{{end}}
+    </ul>
+
+    <h2>Later today</h2>
+    <ul class="task-list">
+      {{range .Today}}{{template "taskrow" (dict "Data" . "CSRF" $.CSRF)}}{{else}}<li class="muted empty">No more tasks due today.</li>{{end}}
+    </ul>
+  </section>
+  <section>
+    <h2>Upcoming reminders <span class="muted small">next 24h</span></h2>
+    <ul class="plain-list">
+      {{range .Upcoming}}
+      <li><a href="/reminders/{{.ID}}"><span class="muted">{{short .NextFireAt}}</span> · {{with .MessageMD}}{{firstline .}}{{end}}{{if .TaskTitle}} <span class="muted">(📋 {{.TaskTitle}})</span>{{end}}</a></li>
+      {{else}}<li class="muted">None.</li>{{end}}
+    </ul>
+    <p class="row gap"><a class="btn small" href="/reminders/new">+ New reminder</a> <a class="btn small" href="/memos">✎ Write a memo</a></p>
+    {{if .Pinned}}
+    <h2>📌 Pinned memos</h2>
+    {{range .Pinned}}<div class="card memo compact"><div class="md">{{md .ContentMD}}</div></div>{{end}}
+    {{end}}
+  </section>
+</div>
+{{end}}

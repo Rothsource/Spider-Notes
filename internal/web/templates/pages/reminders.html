@@ -1,0 +1,36 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>Reminders</h1>
+  <a class="btn primary" href="/reminders/new">+ New reminder</a>
+</div>
+{{if .Open}}
+<h2>Waiting for you</h2>
+{{range .Open}}{{template "occ" (dict "Data" . "CSRF" $.CSRF)}}{{end}}
+{{end}}
+<h2>All reminders</h2>
+<div class="rem-list">
+  {{range .Reminders}}
+  <div class="card rem {{if not .Enabled}}paused{{end}}">
+    <div class="rem-main">
+      <a class="rem-title" href="/reminders/{{.ID}}">{{with .MessageMD}}{{firstline .}}{{else}}📋 Task reminder{{end}}</a>
+      {{if .TaskTitle}}<div class="small">📋 {{.TaskTitle}}</div>{{end}}
+      <div class="muted small">
+        {{if .RepeatRule}}🔁 {{rule .RepeatRule .ActiveWindow}}{{else}}Once{{end}}
+        · {{if .NextFireAt}}next {{short .NextFireAt}}{{else}}finished{{end}}
+        {{if .NagEnabled}} · 🔂 nag every {{.NagIntervalMin}} min{{end}}
+        {{if .IgnoreQuietHours}} · ignores quiet hours{{else if eq .QuietHoursOverride "off"}} · no quiet hours{{else if .QuietHoursOverride}} · quiet {{.QuietHoursOverride}}{{end}}
+        {{range .Tags}} <span class="tag">#{{.}}</span>{{end}}
+      </div>
+    </div>
+    <div class="rem-actions">
+      {{if not .Enabled}}<span class="badge">paused</span>{{end}}
+      <form method="post" action="/reminders/{{.ID}}/{{if .Enabled}}pause{{else}}resume{{end}}">
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+        <button class="btn small">{{if .Enabled}}⏸ Pause{{else}}▶ Resume{{end}}</button>
+      </form>
+      <a class="btn small" href="/reminders/{{.ID}}">Edit</a>
+    </div>
+  </div>
+  {{else}}<p class="muted">No reminders yet. Create one to get Telegram notifications.</p>{{end}}
+</div>
+{{end}}

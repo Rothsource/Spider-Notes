@@ -1,0 +1,15 @@
+{{define "content"}}
+<div class="login-wrap">
+  <form class="card login" method="post" action="/login">
+    <h1>📝 Mynotes</h1>
+    <input type="hidden" name="csrf_token" value="{{.LoginCSRF}}">
+    <label>Username
+      <input name="username" autocomplete="username" required autofocus value="{{with .Username}}{{.}}{{end}}">
+    </label>
+    <label>Password
+      <input name="password" type="password" autocomplete="current-password" required>
+    </label>
+    <button class="btn primary block">Log in</button>
+  </form>
+</div>
+{{end}}

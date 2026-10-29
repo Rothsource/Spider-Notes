@@ -1,0 +1,23 @@
+{{define "content"}}
+<div class="page-head"><h1>Search</h1></div>
+<form class="row gap" method="get" action="/search">
+  <input type="search" name="q" value="{{.Q}}" placeholder="Search memos, tasks and reminders" class="grow" autofocus aria-label="Search">
+  <button class="btn primary">Search</button>
+</form>
+{{if .Q}}
+  {{if .Hits}}
+  <ul class="search-results">
+    {{range .Hits}}
+    <li class="card">
+      <div>
+        <span class="badge">{{.Kind}}</span>
+        <a href="{{if eq .Kind "memo"}}/memos?date={{iso .When}}#memo-{{.ID}}{{else if eq .Kind "task"}}/tasks/{{.ID}}{{else}}/reminders/{{.ID}}{{end}}"><strong>{{.Title}}</strong></a>
+        <span class="muted small">{{short .When}}</span>
+      </div>
+      <div class="snippet">{{snippet .Snippet}}</div>
+    </li>
+    {{end}}
+  </ul>
+  {{else}}<p class="muted">No results for “{{.Q}}”.</p>{{end}}
+{{end}}
+{{end}}

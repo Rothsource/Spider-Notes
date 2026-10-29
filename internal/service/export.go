@@ -53,7 +53,7 @@ func (s *Service) BuildExport(ctx context.Context) (map[string][]byte, error) {
 	}
 	hDay := map[string][]model.Occurrence{}
 	for _, o := range hist {
-		d := o.ScheduledFor.In(s.loc).Format("2006-01-02")
+		d := OutcomeTime(&o).In(s.loc).Format("2006-01-02")
 		hDay[d] = append(hDay[d], o)
 	}
 	for day, list := range hDay {

@@ -1,0 +1,73 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>History</h1>
+  <div class="row gap seg">
+    <a class="btn {{if eq .Range "day"}}active{{end}}" href="/history?range=day&date={{iso .From}}">Day</a>
+    <a class="btn {{if eq .Range "week"}}active{{end}}" href="/history?range=week&date={{iso .From}}">Week</a>
+    <a class="btn {{if eq .Range "month"}}active{{end}}" href="/history?range=month&date={{iso .From}}">Month</a>
+  </div>
+</div>
+<form class="filters card" method="get" action="/history">
+  <input type="hidden" name="range" value="{{.Range}}">
+  <a class="btn" href="/history?range={{.Range}}&date={{.Prev}}" aria-label="Previous">‹</a>
+  <input type="date" name="date" value="{{iso .From}}" aria-label="Date">
+  <a class="btn" href="/history?range={{.Range}}&date={{.Next}}" aria-label="Next">›</a>
+  <select name="kind" aria-label="Type">
+    <option value="">Tasks &amp; reminders</option>
+    <option value="task" {{if eq .F.Kind "task"}}selected{{end}}>Tasks</option>
+    <option value="reminder" {{if eq .F.Kind "reminder"}}selected{{end}}>Reminders</option>
+  </select>
+  <select name="status" aria-label="Outcome">
+    <option value="">Any outcome</option>
+    <option value="done" {{if eq .F.Status "done"}}selected{{end}}>Done</option>
+    <option value="skipped" {{if eq .F.Status "skipped"}}selected{{end}}>Skipped</option>
+    <option value="missed" {{if eq .F.Status "missed"}}selected{{end}}>Missed</option>
+  </select>
+  <select name="tag" aria-label="Tag">
+    <option value="">Any tag</option>
+    {{range .Tags}}<option value="{{.Name}}" {{if eq $.F.Tag .Name}}selected{{end}}>#{{.Name}}</option>{{end}}
+  </select>
+  <button class="btn">Apply</button>
+</form>
+
+<p class="muted">{{iso .From}} → {{iso .To}}: <strong>{{.Total}}</strong> entries ·
+  ✅ {{or (index .Counts "done") 0}} done · ⏭ {{or (index .Counts "skipped") 0}} skipped · ⚠️ {{or (index .Counts "missed") 0}} missed</p>
+
+<div class="grid-2 history-grid">
+  <section>
+    {{range .Groups}}
+    <h3 class="day-head">{{day .Day}}</h3>
+    <ul class="hist-list">
+      {{range .Items}}
+      <li class="hist st-{{.Status}}">
+        <span class="hist-icon">{{if eq .Status "done"}}✅{{else if eq .Status "skipped"}}⏭{{else}}⚠️{{end}}</span>
+        <span class="hist-time muted">{{hm .ScheduledFor}}</span>
+        <a href="{{if eq .Kind "task"}}/tasks/{{deref .TaskID}}{{else}}/reminders/{{deref .ReminderID}}{{end}}">{{if eq .Kind "task"}}📋{{else}}🔔{{end}} {{.Title}}</a>
+        <span class="muted small">
+          {{.Status}}{{if .DoneAt}} at {{hm .DoneAt}}{{end}}{{if and .ActionSource (ne .ActionSource "system")}} via {{.ActionSource}}{{end}}
+          {{if gt .SentCount 1}} · {{.SentCount}} sends{{end}}{{if .SnoozeCount}} · {{.SnoozeCount}} snoozes{{end}}
+        </span>
+      </li>
+      {{end}}
+    </ul>
+    {{else}}<p class="muted empty">Nothing completed, skipped or missed in this period.</p>{{end}}
+  </section>
+  <section>
+    <h2>Completion rate</h2>
+    {{if .Stats}}
+    <table class="stats">
+      <thead><tr><th>Item</th><th>7 days</th><th>30 days</th></tr></thead>
+      <tbody>
+      {{range .Stats}}
+      <tr>
+        <td>{{if eq .Kind "task"}}📋{{else}}🔔{{end}} {{.Title}}</td>
+        <td>{{if .Total7}}<span class="bar" style="--p: {{pct .Rate7}}"></span> {{pct .Rate7}} <span class="muted small">{{.Done7}}/{{.Total7}}</span>{{else}}<span class="muted">—</span>{{end}}</td>
+        <td><span class="bar" style="--p: {{pct .Rate30}}"></span> {{pct .Rate30}} <span class="muted small">{{.Done30}}/{{.Total30}}</span></td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}<p class="muted">No data yet.</p>{{end}}
+  </section>
+</div>
+{{end}}

@@ -104,12 +104,16 @@ func (d *DB) queryOccs(ctx context.Context, q string, args ...any) ([]model.Occu
 func (d *DB) ListOccurrences(ctx context.Context, f model.OccurrenceFilter) ([]model.Occurrence, error) {
 	where := []string{"1=1"}
 	var args []any
+	timeCol := "o.scheduled_for"
+	if f.ByOutcome {
+		timeCol = "COALESCE(o.done_at, o.scheduled_for)"
+	}
 	if f.From != nil {
-		where = append(where, "o.scheduled_for >= ?")
+		where = append(where, timeCol+" >= ?")
 		args = append(args, ft(*f.From))
 	}
 	if f.To != nil {
-		where = append(where, "o.scheduled_for < ?")
+		where = append(where, timeCol+" < ?")
 		args = append(args, ft(*f.To))
 	}
 	if len(f.Statuses) > 0 {
@@ -142,7 +146,7 @@ func (d *DB) ListOccurrences(ctx context.Context, f model.OccurrenceFilter) ([]m
 		limit = 1000
 	}
 	args = append(args, limit)
-	return d.queryOccs(ctx, `SELECT `+occCols+occFrom+`WHERE `+strings.Join(where, " AND ")+` ORDER BY o.scheduled_for DESC, o.id DESC LIMIT ?`, args...)
+	return d.queryOccs(ctx, `SELECT `+occCols+occFrom+`WHERE `+strings.Join(where, " AND ")+` ORDER BY `+timeCol+` DESC, o.id DESC LIMIT ?`, args...)
 }
 
 // DueDeliveries implements store.Occurrences.

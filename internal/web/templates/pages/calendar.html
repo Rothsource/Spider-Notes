@@ -1,0 +1,59 @@
+{{define "content"}}
+<div class="page-head cal-head">
+  <div class="row gap">
+    <a class="btn" href="/calendar?view={{.View}}&date={{.Prev}}" aria-label="Previous">‹</a>
+    <a class="btn" href="/calendar?view={{.View}}&date={{.Today}}">Today</a>
+    <a class="btn" href="/calendar?view={{.View}}&date={{.Next}}" aria-label="Next">›</a>
+  </div>
+  <h1>{{.Label}}</h1>
+  <div class="row gap seg">
+    <a class="btn {{if eq .View "month"}}active{{end}}" href="/calendar?view=month&date={{iso .Anchor}}">Month</a>
+    <a class="btn {{if eq .View "week"}}active{{end}}" href="/calendar?view=week&date={{iso .Anchor}}">Week</a>
+  </div>
+</div>
+<div class="legend small muted">
+  <span class="cal-item kind-task st-pending">task</span>
+  <span class="cal-item kind-reminder st-upcoming">reminder</span>
+  <span class="cal-item kind-task st-overdue">overdue</span>
+  <span class="cal-item kind-reminder st-done">done</span>
+  <span class="cal-item kind-reminder st-skipped">skipped</span>
+  <span class="cal-item kind-reminder st-missed">missed</span>
+  <span class="cal-item kind-reminder st-paused">paused</span>
+  <span>● memos</span>
+</div>
+
+<div class="cal-layout">
+{{if eq .View "month"}}
+  <div class="cal-month">
+    <div class="cal-dow">{{range (seq 1 7)}}<div>{{index (weekdays) (rem7 .)}}</div>{{end}}</div>
+    {{range .Weeks}}
+    <div class="cal-week">
+      {{range .}}
+      <div class="cal-day {{if not .InMonth}}out{{end}} {{if .Today}}today{{end}}" hx-get="/calendar/day?date={{.ISO}}" hx-target="#day-panel" hx-swap="innerHTML" tabindex="0" role="button" aria-label="{{day .Date}}">
+        <div class="cal-date">{{.Date.Day}}{{if .Memos}} <span class="memo-dot" title="{{.Memos}} memo(s)">●</span>{{end}}</div>
+        {{range .Items}}{{template "calitem" .}}{{end}}
+        {{if .More}}<div class="muted small">+{{.More}} more</div>{{end}}
+      </div>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+{{else}}
+  <div class="cal-weekview">
+    <div class="wv-row wv-headrow">
+      <div class="wv-hour"></div>
+      {{range .Days}}<div class="wv-dayhead {{if .Today}}today{{end}}" hx-get="/calendar/day?date={{.ISO}}" hx-target="#day-panel" hx-swap="innerHTML" role="button" tabindex="0">{{.Date.Format "Mon 02"}}{{if .Memos}} <span class="memo-dot">●</span>{{end}}</div>{{end}}
+    </div>
+    <div class="wv-body" id="wv-body">
+      {{range .Rows}}
+      <div class="wv-row" {{if eq .Hour 7}}id="wv-7"{{end}}>
+        <div class="wv-hour">{{printf "%02d:00" .Hour}}</div>
+        {{range .Cells}}<div class="wv-cell">{{range .}}{{template "calitem" .}}{{end}}</div>{{end}}
+      </div>
+      {{end}}
+    </div>
+  </div>
+{{end}}
+  <aside class="day-panel card" id="day-panel" aria-live="polite"><p class="muted">Click a day to see everything on it and add tasks or reminders.</p></aside>
+</div>
+{{end}}

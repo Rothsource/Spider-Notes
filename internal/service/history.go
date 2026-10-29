@@ -19,13 +19,22 @@ type HistoryFilter struct {
 	Status   string // done | skipped | missed | "" (all closed)
 }
 
-// History returns closed occurrences in a range, newest first.
+// History returns closed occurrences whose outcome happened in the range
+// (done_at, or scheduled time for missed items), newest first.
 func (s *Service) History(ctx context.Context, f HistoryFilter) ([]model.Occurrence, error) {
 	statuses := historyStatuses
 	if f.Status != "" {
 		statuses = []string{f.Status}
 	}
-	return s.st.ListOccurrences(ctx, model.OccurrenceFilter{From: &f.From, To: &f.To, Kind: f.Kind, Tag: f.Tag, Statuses: statuses, Limit: 5000})
+	return s.st.ListOccurrences(ctx, model.OccurrenceFilter{From: &f.From, To: &f.To, Kind: f.Kind, Tag: f.Tag, Statuses: statuses, Limit: 5000, ByOutcome: true})
+}
+
+// OutcomeTime is when an occurrence's outcome happened (used to group history).
+func OutcomeTime(o *model.Occurrence) time.Time {
+	if o.DoneAt != nil {
+		return *o.DoneAt
+	}
+	return o.ScheduledFor
 }
 
 // Stat is completion statistics for one reminder or task.

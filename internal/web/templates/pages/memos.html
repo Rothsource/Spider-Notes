@@ -1,0 +1,46 @@
+{{define "content"}}
+<div class="memos-layout">
+  <div class="memos-main">
+    <form class="card capture" hx-post="/memos" hx-target="#memo-new" hx-swap="afterbegin" id="capture-form">
+      <textarea name="content" class="memo-input" rows="3" maxlength="20000" required
+        placeholder="What's on your mind? Use #tags, - [ ] checkboxes, **Markdown**. Enter to save, Shift+Enter for a new line." data-enter-submit autofocus></textarea>
+      <div class="row between">
+        <span class="muted small">Markdown · #tags · Enter to save</span>
+        <button class="btn primary">Save</button>
+      </div>
+    </form>
+
+    <form class="row gap" method="get" action="/memos">
+      <input type="search" name="q" value="{{.Q}}" placeholder="Search memos" class="grow" aria-label="Search memos">
+      {{if .Tag}}<input type="hidden" name="tag" value="{{.Tag}}">{{end}}
+      <button class="btn">Search</button>
+    </form>
+    {{if or .Tag .Q .Date}}
+    <p class="filter-note">
+      Showing {{if .Tag}}<span class="tag">#{{.Tag}}</span>{{end}}{{if .Q}} matching “{{.Q}}”{{end}}{{if .Date}} on {{.Date}}{{end}}
+      · <a href="/memos">clear</a>
+    </p>
+    {{end}}
+
+    {{if .Pinned}}
+    <section class="pinned-list">
+      <h3 class="day-head">📌 Pinned</h3>
+      {{range .Pinned}}{{template "memo" (dict "Data" . "CSRF" $.CSRF)}}{{end}}
+    </section>
+    {{end}}
+
+    <div id="memo-new"></div>
+    <div id="timeline">
+      {{template "memopage" (dict "Data" .Page "CSRF" .CSRF)}}
+      {{if not .Page.Groups}}<p class="muted empty">No memos yet.</p>{{end}}
+    </div>
+  </div>
+  <aside class="tag-sidebar card">
+    <h3>Tags</h3>
+    <ul class="plain-list">
+      <li><a href="/memos" {{if not .Tag}}class="active"{{end}}>All memos</a></li>
+      {{range .Tags}}<li><a href="/memos?tag={{.Name}}" {{if eq $.Tag .Name}}class="active"{{end}}>#{{.Name}} <span class="muted">{{.Count}}</span></a></li>{{end}}
+    </ul>
+  </aside>
+</div>
+{{end}}

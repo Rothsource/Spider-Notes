@@ -1,0 +1,35 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>Tasks</h1>
+  <a class="btn primary" href="/tasks/new">+ New task</a>
+</div>
+<form class="filters card" method="get" action="/tasks">
+  <select name="status" aria-label="Status">
+    <option value="pending" {{if eq .F.Status "pending"}}selected{{end}}>Pending</option>
+    <option value="done" {{if eq .F.Status "done"}}selected{{end}}>Done</option>
+    <option value="all" {{if eq .F.Status "all"}}selected{{end}}>All</option>
+  </select>
+  <select name="range" aria-label="When">
+    <option value="">Any date</option>
+    <option value="today" {{if eq .F.Range "today"}}selected{{end}}>Today</option>
+    <option value="week" {{if eq .F.Range "week"}}selected{{end}}>This week</option>
+    <option value="overdue" {{if eq .F.Range "overdue"}}selected{{end}}>Overdue</option>
+    <option value="nodate" {{if eq .F.Range "nodate"}}selected{{end}}>No date</option>
+  </select>
+  <select name="priority" aria-label="Priority">
+    <option value="">Any priority</option>
+    <option value="high" {{if eq .F.Priority "high"}}selected{{end}}>High</option>
+    <option value="normal" {{if eq .F.Priority "normal"}}selected{{end}}>Normal</option>
+    <option value="low" {{if eq .F.Priority "low"}}selected{{end}}>Low</option>
+  </select>
+  <select name="tag" aria-label="Tag">
+    <option value="">Any tag</option>
+    {{range .Tags}}<option value="{{.Name}}" {{if eq $.F.Tag .Name}}selected{{end}}>#{{.Name}} ({{.Count}})</option>{{end}}
+  </select>
+  <input type="search" name="q" value="{{.F.Query}}" placeholder="Search tasks" aria-label="Search tasks">
+  <button class="btn">Filter</button>
+</form>
+<ul class="task-list">
+  {{range .Tasks}}{{template "taskrow" (dict "Data" . "CSRF" $.CSRF)}}{{else}}<li class="muted empty">No tasks here.</li>{{end}}
+</ul>
+{{end}}

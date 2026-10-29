@@ -210,6 +210,9 @@ type OccurrenceFilter struct {
 	ReminderID int64
 	TaskID     int64
 	Limit      int
+	// ByOutcome filters and orders by when the outcome happened (done_at,
+	// falling back to scheduled_for) instead of by scheduled time.
+	ByOutcome bool
 }
 
 // MemoFilter filters memo listings.
