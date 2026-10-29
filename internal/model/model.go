@@ -3,6 +3,7 @@ package model
 
 import (
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -219,4 +220,18 @@ type MemoFilter struct {
 	BeforeID int64
 	From, To *time.Time
 	Limit    int
+}
+
+// FirstLine returns the first non-empty line of s, trimmed of Markdown markers and capped in length.
+func FirstLine(s string) string {
+	for _, l := range strings.Split(s, "\n") {
+		l = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(l), "#>-*"))
+		if l != "" {
+			if r := []rune(l); len(r) > 120 {
+				return string(r[:117]) + "..."
+			}
+			return l
+		}
+	}
+	return ""
 }

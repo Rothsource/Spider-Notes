@@ -26,26 +26,12 @@ func scanOcc(sc interface{ Scan(...any) error }) (model.Occurrence, error) {
 		&msg, &title, &o.Repeating)
 	if o.ReminderID != nil {
 		o.Kind = "reminder"
-		o.Title = FirstLine(msg)
+		o.Title = model.FirstLine(msg)
 	} else {
 		o.Kind = "task"
 		o.Title = title
 	}
 	return o, err
-}
-
-// FirstLine returns the first non-empty line of s, trimmed of Markdown markers and capped in length.
-func FirstLine(s string) string {
-	for _, l := range strings.Split(s, "\n") {
-		l = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(l), "#>-*"))
-		if l != "" {
-			if r := []rune(l); len(r) > 120 {
-				return string(r[:117]) + "..."
-			}
-			return l
-		}
-	}
-	return ""
 }
 
 // InsertOccurrence implements store.Occurrences.
@@ -310,7 +296,7 @@ func (d *DB) Search(ctx context.Context, q string, limit int) ([]model.SearchHit
 			return nil, err
 		}
 		if h.Title == "" {
-			h.Title = FirstLine(strings.NewReplacer(MarkStart, "", MarkEnd, "").Replace(h.Snippet))
+			h.Title = model.FirstLine(strings.NewReplacer(MarkStart, "", MarkEnd, "").Replace(h.Snippet))
 		}
 		out = append(out, h)
 	}
