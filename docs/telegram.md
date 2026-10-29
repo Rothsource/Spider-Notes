@@ -49,6 +49,8 @@ result and its buttons are removed, e.g. `✅ Done at 08:20`,
 | Non-blocking delivery | Messages go through an outbox worker with retries, exponential backoff and Telegram's `retry_after` handling. The scheduler never waits on Telegram. |
 | No secrets in logs | The bot token is redacted from all error and library log output. |
 
+For API tokens and connecting other platforms, see [integrations.md](integrations.md).
+
 ## Changing or disabling the bot
 
 - Change the token or chat ID in **Settings → Telegram**; the bot reconnects immediately.

@@ -13,6 +13,7 @@ web UI and an SQLite database.
 | [User Guide](user-guide.md) | Every page of the web app and how to use it |
 | [Reminders & Scheduling](reminders-and-scheduling.md) | Repeat rules, nag mode, quiet hours, snooze, the occurrence lifecycle |
 | [Telegram Bot](telegram.md) | Bot setup, message format, buttons, security rules |
+| [Integrations and Tokens](integrations.md) | Telegram setup, API tokens, connecting scripts, n8n, Home Assistant, phone shortcuts, AI agents |
 | [Installation & Deployment](deployment.md) | Docker, servers behind a jump host, SSH tunnels, reverse proxies |
 | [Configuration](configuration.md) | Environment variables and in-app settings |
 | [Operations](operations.md) | Backup, restore, upgrades, Memos import, logs, troubleshooting |
