@@ -2,6 +2,8 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/sovannroth/mynotes/internal/model"
@@ -240,4 +242,24 @@ func (d *DB) ListAttachments(ctx context.Context, f model.AttachmentFilter) ([]m
 // SoftDeleteAttachment implements store.Attachments.
 func (d *DB) SoftDeleteAttachment(ctx context.Context, id int64, at time.Time) error {
 	return checkAffected(d.q.ExecContext(ctx, `UPDATE attachments SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`, ft(at), ft(at), id))
+}
+
+// ---- imports ----
+
+// ImportedID implements store.Imports.
+func (d *DB) ImportedID(ctx context.Context, source, key string) (int64, error) {
+	var id int64
+	err := d.q.QueryRowContext(ctx, `SELECT target_id FROM imports WHERE source = ? AND source_key = ?`, source, key).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return id, err
+}
+
+// RecordImport implements store.Imports.
+func (d *DB) RecordImport(ctx context.Context, source, key, kind string, id int64, at time.Time) error {
+	_, err := d.q.ExecContext(ctx, `INSERT INTO imports(source, source_key, target_kind, target_id, imported_at) VALUES (?,?,?,?,?)
+		ON CONFLICT(source, source_key) DO UPDATE SET target_kind = excluded.target_kind, target_id = excluded.target_id, imported_at = excluded.imported_at`,
+		source, key, kind, id, ft(at))
+	return err
 }

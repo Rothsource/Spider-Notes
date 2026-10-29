@@ -50,6 +50,8 @@ func main() {
 		err = backup(args)
 	case "healthcheck":
 		err = healthcheck()
+	case "import-memos":
+		err = importMemos(args)
 	case "version":
 		fmt.Println(version)
 	default:

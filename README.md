@@ -151,6 +151,30 @@ docker compose cp app:/data/attachments ./attachments-backup
 
 Back up the `.env` file too: it holds the session secret and the initial credentials.
 
+## Import from Memos
+
+Copy notes from a [Memos](https://usememos.com) install. The importer reads a
+**copy** of the Memos data folder strictly read-only. It keeps creation and
+edit dates, pinned state, #tags and attached files (from `assets/` or stored
+in the database). Running it again never creates duplicates.
+
+```bash
+# 1. Back up the Memos data folder (stop Memos for a moment so the DB is consistent)
+docker stop memos
+cp -a /path/to/memos-data /home/me/memos-backup
+docker start memos
+
+# 2. Copy the backup into Spider Notes and preview
+docker compose cp /home/me/memos-backup app:/data/memos-import
+docker compose exec app /app import-memos --from /data/memos-import --dry-run
+
+# 3. Import
+docker compose exec app /app import-memos --from /data/memos-import
+```
+
+Options: `--archived` also imports archived memos (tagged `#archived`); `-v` prints every memo.
+Files stored in S3 or as external links are reported and not copied.
+
 ## Markdown export
 
 **Settings → Export to Markdown** (or the optional daily auto-export) writes to `APP_EXPORT_DIR`:

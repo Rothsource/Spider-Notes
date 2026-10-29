@@ -24,6 +24,7 @@ type Store interface {
 	Search
 	Notes
 	Attachments
+	Imports
 
 	// InTx runs fn inside a transaction. The Store passed to fn must be used
 	// for all operations within the transaction.
@@ -149,6 +150,13 @@ type Attachments interface {
 	GetAttachment(ctx context.Context, id int64) (*model.Attachment, error)
 	ListAttachments(ctx context.Context, f model.AttachmentFilter) ([]model.Attachment, error)
 	SoftDeleteAttachment(ctx context.Context, id int64, at time.Time) error
+}
+
+// Imports tracks items imported from other apps.
+type Imports interface {
+	// ImportedID returns the target id for a source item, or 0 if not imported yet.
+	ImportedID(ctx context.Context, source, key string) (int64, error)
+	RecordImport(ctx context.Context, source, key, kind string, id int64, at time.Time) error
 }
 
 // Search runs full-text search.
