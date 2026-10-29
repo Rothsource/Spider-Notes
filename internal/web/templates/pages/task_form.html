@@ -13,7 +13,7 @@
     <textarea name="description" rows="4" maxlength="20000" placeholder="Notes (Markdown)" aria-label="Description" data-autosize>{{$t.DescriptionMD}}</textarea>
 
     <div class="field-grid">
-      <label>{{icon "clock"}} Start <span class="muted">(optional)</span><input type="datetime-local" name="start" value="{{dtlocal $t.StartAt}}"></label>
+      <label>{{icon "clock"}} Start<input title="Optional" type="datetime-local" name="start" value="{{dtlocal $t.StartAt}}"></label>
       <label>{{icon "calendar"}} Due<input type="datetime-local" name="due" value="{{dtlocal $t.DueAt}}"></label>
       <label>{{icon "bell"}} Alert
         <select name="alert">
