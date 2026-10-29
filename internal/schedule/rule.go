@@ -45,7 +45,9 @@ type Rule struct {
 }
 
 // HasWindow reports whether an active window is configured.
-func (r Rule) HasWindow() bool { return r.WindowStart >= 0 && r.WindowEnd >= 0 && r.WindowStart != r.WindowEnd }
+func (r Rule) HasWindow() bool {
+	return r.WindowStart >= 0 && r.WindowEnd >= 0 && r.WindowStart != r.WindowEnd
+}
 
 var dayCodes = []string{"SU", "MO", "TU", "WE", "TH", "FR", "SA"}
 
