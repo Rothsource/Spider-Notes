@@ -24,18 +24,19 @@
           {{range .Currencies}}<option value="{{.Code}}" {{if eq .Code $.Currency}}selected{{end}}>{{.Code}} {{.Symbol}}</option>{{end}}
         </select>
       </div>
+      <div class="exp-cat-row">
+        <div class="section-label">Category <a class="exp-manage" href="/expense-categories?back={{.Back}}">Manage</a></div>
+        {{template "catpicker" (dict "Cats" .Categories "Sel" "")}}
+      </div>
       <div class="field-grid">
-        <label>{{icon "hash"}} Category<input name="category" list="exp-cats" maxlength="60" placeholder="Food, Transport…"></label>
-        <label>{{icon "wallet"}} Payment<input name="payment" list="exp-pays" maxlength="60" placeholder="Cash, ABA, Card…"></label>
-        <label>{{icon "clock"}} When<input type="datetime-local" name="spent_at" title="Leave empty to use the current time"></label>
+        <label>{{icon "wallet"}} Payment <span class="muted">(optional)</span><input name="payment" list="exp-pays" maxlength="60" placeholder="Cash, ABA, Card…"></label>
       </div>
       <textarea name="note" rows="2" maxlength="20000" placeholder="Description (optional)" aria-label="Description" data-autosize></textarea>
       <div class="form-actions">
-        <span class="hint grow">Date and time are recorded automatically unless you set <em>When</em>.</span>
+        <span class="hint grow">{{icon "clock"}} Date and time are recorded automatically.</span>
         <button class="btn primary">{{icon "plus"}}Add expense</button>
       </div>
     </form>
-    <datalist id="exp-cats">{{range .Categories}}<option value="{{.}}">{{end}}</datalist>
     <datalist id="exp-pays">{{range .Payments}}<option value="{{.}}">{{end}}</datalist>
 
     <form class="filter-bar" method="get" action="/expenses">
@@ -49,7 +50,7 @@
       {{end}}
       <select name="category" aria-label="Category" data-autosubmit>
         <option value="">All categories</option>
-        {{range .Categories}}<option value="{{.}}" {{if eq $v.Category .}}selected{{end}}>{{.}}</option>{{end}}
+        {{range .Categories}}<option value="{{.Name}}" {{if eq $v.Category .Name}}selected{{end}}>{{with .Emoji}}{{.}} {{end}}{{.Name}}</option>{{end}}
       </select>
       <input type="search" name="q" value="{{$v.Query}}" placeholder="Search…" aria-label="Search expenses" class="exp-search">
       <span class="grow"></span>
@@ -73,7 +74,7 @@
           <span class="list-title">{{.Item}}</span>
           <span class="meta">
             <span>{{icon "clock"}}{{hm .SpentAt}}</span>
-            {{with .Category}}<span class="pill">{{.}}</span>{{end}}
+            {{with .Category}}<span class="pill">{{with index $.CatEmoji .}}{{.}} {{end}}{{.}}</span>{{end}}
             {{with .Payment}}<span>{{.}}</span>{{end}}
             {{with .Note}}<span class="exp-note">{{firstline .}}</span>{{end}}
           </span>
@@ -92,7 +93,7 @@
       <div class="rate-list">
         {{range .Summary.ByCategory}}
         <a class="exp-cat" href="{{$v.URL "/expenses" "category" .Category}}">
-          <div class="rate-title"><span>{{or .Category "Uncategorised"}}</span><span class="grow"></span><span class="exp-cat-amt">{{.Display}}</span></div>
+          <div class="rate-title"><span>{{with .Category}}{{with index $.CatEmoji .}}{{.}} {{end}}{{.}}{{else}}Uncategorised{{end}}</span><span class="grow"></span><span class="exp-cat-amt">{{.Display}}</span></div>
           <div class="rate-bars"><span class="bar" style="--p: {{pct .Share}}"></span><span class="rate-num">{{pct .Share}}</span></div>
         </a>
         {{end}}

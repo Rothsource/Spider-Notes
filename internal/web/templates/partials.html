@@ -195,3 +195,17 @@
 {{range .Memos}}<div class="memo compact"><div class="memo-time">{{hm .CreatedAt}}</div><div class="md">{{md .ContentMD}}</div></div>{{end}}
 {{end}}
 {{end}}{{end}}
+
+{{/* Expense category chips. Args: Cats ([]ExpenseCategory), Sel (selected name). */}}
+{{define "catpicker"}}
+<div class="cat-picker" data-switch role="radiogroup" aria-label="Category">
+  {{$sel := .Sel}}{{$found := eq $sel ""}}
+  <label><input type="radio" name="category" value="" data-switch-source {{if eq $sel ""}}checked{{end}}><span class="muted">None</span></label>
+  {{range .Cats}}{{if eq $sel .Name}}{{$found = true}}{{end}}
+  <label><input type="radio" name="category" value="{{.Name}}" data-switch-source {{if eq $sel .Name}}checked{{end}}><span>{{with .Emoji}}<b class="cat-emoji">{{.}}</b>{{end}}{{.Name}}</span></label>
+  {{end}}
+  {{if not $found}}<label><input type="radio" name="category" value="{{$sel}}" data-switch-source checked><span>{{$sel}}</span></label>{{end}}
+  <label><input type="radio" name="category" value="__new__" data-switch-source><span>{{icon "plus"}}New</span></label>
+  <input name="category_new" maxlength="60" placeholder="New category name, e.g. Coffee" aria-label="New category name" class="cat-new" data-show="__new__">
+</div>
+{{end}}

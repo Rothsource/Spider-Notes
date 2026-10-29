@@ -21,7 +21,36 @@ func (s *Server) registerExpenses(p func(string, http.HandlerFunc)) {
 	p("GET /expenses/{id}", s.expenseForm)
 	p("POST /expenses/{id}", s.expenseSave)
 	p("POST /expenses/{id}/delete", s.expenseDelete)
+	p("GET /expense-categories", s.categoriesPage)
+	p("POST /expense-categories", s.categorySave)
+	p("POST /expense-categories/{id}", s.categorySave)
+	p("POST /expense-categories/{id}/delete", s.categoryDelete)
 }
+
+// categoryData loads the category picker data shared by the expense pages.
+func (s *Server) categoryData(r *http.Request, data page) {
+	cats, err := s.svc.ListExpenseCategories(r.Context())
+	if err != nil {
+		slog.Error("list expense categories", "err", err)
+	}
+	emoji := map[string]string{}
+	for _, c := range cats {
+		emoji[c.Name] = c.Emoji
+	}
+	pays, _ := s.svc.ExpensePayments(r.Context())
+	data["Categories"], data["CatEmoji"], data["Payments"] = cats, emoji, pays
+}
+
+// formCategory reads the category picker: a chosen chip, or the "New" text box.
+func formCategory(r *http.Request) string {
+	if c := r.FormValue("category"); c != newCategory {
+		return c
+	}
+	return r.FormValue("category_new")
+}
+
+// newCategory is the value of the picker's "+ New" chip.
+const newCategory = "__new__"
 
 // expenseView is the period and filter shown on the expenses page.
 type expenseView struct {
@@ -115,10 +144,10 @@ func (s *Server) expensesPage(w http.ResponseWriter, r *http.Request) {
 			start = i + 1
 		}
 	}
-	cats, pays, _ := s.svc.ExpenseSuggestions(r.Context())
-	s.render(w, r, "expenses", page{"Title": "Expenses", "View": v, "Days": days, "Summary": service.SummarizeExpenses(list),
-		"Categories": cats, "Payments": pays, "Currencies": model.Currencies, "Currency": s.svc.LastCurrency(r.Context()),
-		"Back": v.URL("/expenses")})
+	data := page{"Title": "Expenses", "View": v, "Days": days, "Summary": service.SummarizeExpenses(list),
+		"Currencies": model.Currencies, "Currency": s.svc.LastCurrency(r.Context()), "Back": v.URL("/expenses")}
+	s.categoryData(r, data)
+	s.render(w, r, "expenses", data)
 }
 
 func (s *Server) expenseForm(w http.ResponseWriter, r *http.Request) {
@@ -136,9 +165,8 @@ func (s *Server) expenseForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) renderExpenseForm(w http.ResponseWriter, r *http.Request, e *model.Expense, errMsg string) {
-	cats, pays, _ := s.svc.ExpenseSuggestions(r.Context())
-	data := page{"Title": "Expense", "E": e, "Categories": cats, "Payments": pays, "Currencies": model.Currencies,
-		"Back": safeBack(r, "/expenses")}
+	data := page{"Title": "Expense", "E": e, "Currencies": model.Currencies, "Back": safeBack(r, "/expenses")}
+	s.categoryData(r, data)
 	if errMsg != "" {
 		data["Error"] = errMsg
 		w.WriteHeader(http.StatusBadRequest)
@@ -154,7 +182,7 @@ func (s *Server) expenseSave(w http.ResponseWriter, r *http.Request) {
 	}
 	spent, err := s.parseDT(r.FormValue("spent_at"))
 	in := service.ExpenseInput{Item: r.FormValue("item"), Amount: json.Number(r.FormValue("amount")), Currency: r.FormValue("currency"),
-		Category: r.FormValue("category"), Payment: r.FormValue("payment"), Note: r.FormValue("note"), SpentAt: spent}
+		Category: formCategory(r), Payment: r.FormValue("payment"), Note: r.FormValue("note"), SpentAt: spent}
 	var e *model.Expense
 	if err == nil {
 		if r.PathValue("id") != "" {
@@ -213,4 +241,55 @@ func (s *Server) expensesExport(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
 	w.Header().Set("Cache-Control", "no-store")
 	_, _ = buf.WriteTo(w)
+}
+
+// ---- categories ----
+
+func (s *Server) categoriesPage(w http.ResponseWriter, r *http.Request) {
+	data := page{"Title": "Expense categories", "Back": safeBack(r, "/expenses")}
+	s.categoryData(r, data)
+	s.render(w, r, "expense_categories", data)
+}
+
+func (s *Server) categorySave(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	if err := r.ParseForm(); err != nil {
+		s.fail(w, r, model.Invalid("Bad form"))
+		return
+	}
+	in := service.CategoryInput{Name: r.FormValue("name"), Emoji: r.FormValue("emoji")}
+	var err error
+	msg := "Category added"
+	if r.PathValue("id") != "" {
+		var id int64
+		if id, err = pathID(r); err == nil {
+			_, err = s.svc.UpdateExpenseCategory(r.Context(), id, in)
+		}
+		msg = "Category saved"
+	} else {
+		_, err = s.svc.CreateExpenseCategory(r.Context(), in)
+	}
+	back := "/expense-categories?back=" + url.QueryEscape(safeBack(r, "/expenses"))
+	if err != nil {
+		var ve *model.ValidationError
+		if errors.As(err, &ve) {
+			redirect(w, r, back+"&err="+url.QueryEscape(ve.Msg), "")
+			return
+		}
+		s.fail(w, r, err)
+		return
+	}
+	redirect(w, r, back, msg)
+}
+
+func (s *Server) categoryDelete(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err == nil {
+		err = s.svc.DeleteExpenseCategory(r.Context(), id)
+	}
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	redirect(w, r, "/expense-categories?back="+url.QueryEscape(safeBack(r, "/expenses")), "Category removed")
 }

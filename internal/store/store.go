@@ -176,4 +176,13 @@ type Expenses interface {
 	// ExpenseValues returns the distinct categories or payment methods ("category"/"payment"), most used first.
 	ExpenseValues(ctx context.Context, column string) ([]string, error)
 	SoftDeleteExpense(ctx context.Context, id int64, at time.Time) error
+
+	ListExpenseCategories(ctx context.Context) ([]model.ExpenseCategory, error)
+	GetExpenseCategory(ctx context.Context, id int64) (*model.ExpenseCategory, error)
+	// FindExpenseCategory looks a category up by name, ignoring case.
+	FindExpenseCategory(ctx context.Context, name string) (*model.ExpenseCategory, error)
+	CreateExpenseCategory(ctx context.Context, c *model.ExpenseCategory) error
+	// UpdateExpenseCategory saves c; when the name changed, expenses using oldName are renamed too.
+	UpdateExpenseCategory(ctx context.Context, c *model.ExpenseCategory, oldName string) error
+	DeleteExpenseCategory(ctx context.Context, id int64) error
 }

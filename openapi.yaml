@@ -549,6 +549,39 @@ paths:
       responses:
         "204": { description: Deleted }
         default: { $ref: "#/components/responses/Error" }
+  /expense-categories:
+    get:
+      tags: [expenses]
+      operationId: listExpenseCategories
+      summary: Categories offered when recording an expense (presets and your own)
+      responses:
+        "200": { description: Categories, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ExpenseCategory" } } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [expenses]
+      operationId: createExpenseCategory
+      summary: Add a category
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseCategoryInput" } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseCategory" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /expense-categories/{id}:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    put:
+      tags: [expenses]
+      operationId: updateExpenseCategory
+      summary: Rename (existing expenses follow) or change the emoji
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseCategoryInput" } } } }
+      responses:
+        "200": { description: Category, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseCategory" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [expenses]
+      operationId: deleteExpenseCategory
+      summary: Remove from the list (expenses keep the name)
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
   /tags:
     get:
       tags: [views]
@@ -815,7 +848,7 @@ components:
         item: { type: string, maxLength: 200, description: "What the money was spent on" }
         amount: { oneOf: [ { type: number }, { type: string } ], description: "Positive decimal, e.g. 12.5 or \"12.50\". USD/THB/EUR: max 2 decimals; KHR: none" }
         currency: { type: string, enum: [USD, KHR, THB, EUR], default: USD }
-        category: { type: string, maxLength: 60 }
+        category: { type: string, maxLength: 60, description: "A name from /expense-categories; a new name is added to the list" }
         payment: { type: string, maxLength: 60, description: "e.g. Cash, ABA, Card" }
         note: { type: string, maxLength: 20000, description: Description }
         spent_at: { type: [string, "null"], format: date-time, description: "Defaults to now on create; kept when omitted on update" }
@@ -855,6 +888,20 @@ components:
                 properties:
                   category: { type: string }
                   share: { type: number, description: "Share of the currency total, 0..1" }
+    ExpenseCategoryInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 60 }
+        emoji: { type: string, description: "Optional single emoji" }
+    ExpenseCategory:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        emoji: { type: string }
+        position: { type: integer }
+        created_at: { type: string, format: date-time }
     Attachment:
       type: object
       properties:

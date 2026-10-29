@@ -18,6 +18,10 @@ func (a *API) registerExpenses(h func(string, func(http.ResponseWriter, *http.Re
 	h("GET "+p+"/expenses/{id}", a.getExpense)
 	h("PUT "+p+"/expenses/{id}", a.updateExpense)
 	h("DELETE "+p+"/expenses/{id}", a.deleteExpense)
+	h("GET "+p+"/expense-categories", a.listExpenseCategories)
+	h("POST "+p+"/expense-categories", a.createExpenseCategory)
+	h("PUT "+p+"/expense-categories/{id}", a.updateExpenseCategory)
+	h("DELETE "+p+"/expense-categories/{id}", a.deleteExpenseCategory)
 	mux.Handle("GET "+p+"/expenses/export.xlsx", protect(http.HandlerFunc(a.exportExpenses)))
 }
 
@@ -128,4 +132,37 @@ func ServeExpensesXLSX(w http.ResponseWriter, r *http.Request, svc *service.Serv
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
 	w.Header().Set("Cache-Control", "no-store")
 	_, _ = buf.WriteTo(w)
+}
+
+func (a *API) listExpenseCategories(_ http.ResponseWriter, r *http.Request) (any, error) {
+	cats, err := a.svc.ListExpenseCategories(r.Context())
+	return nonNil(cats), err
+}
+
+func (a *API) createExpenseCategory(_ http.ResponseWriter, r *http.Request) (any, error) {
+	var in service.CategoryInput
+	if err := decode(r, &in); err != nil {
+		return nil, err
+	}
+	return a.svc.CreateExpenseCategory(r.Context(), in)
+}
+
+func (a *API) updateExpenseCategory(_ http.ResponseWriter, r *http.Request) (any, error) {
+	id, err := pathID(r)
+	if err != nil {
+		return nil, err
+	}
+	var in service.CategoryInput
+	if err := decode(r, &in); err != nil {
+		return nil, err
+	}
+	return a.svc.UpdateExpenseCategory(r.Context(), id, in)
+}
+
+func (a *API) deleteExpenseCategory(_ http.ResponseWriter, r *http.Request) (any, error) {
+	id, err := pathID(r)
+	if err != nil {
+		return nil, err
+	}
+	return noContent{}, a.svc.DeleteExpenseCategory(r.Context(), id)
 }

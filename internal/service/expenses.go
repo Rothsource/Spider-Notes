@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"math"
 	"sort"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/sovannroth/mynotes/internal/model"
+	"github.com/sovannroth/mynotes/internal/store"
 	"github.com/sovannroth/mynotes/internal/xlsx"
 )
 
@@ -129,7 +131,14 @@ func (s *Service) CreateExpense(ctx context.Context, in ExpenseInput) (*model.Ex
 	if err := s.buildExpense(in, e, now); err != nil {
 		return nil, err
 	}
-	return e, s.st.CreateExpense(ctx, e)
+	err := s.st.InTx(ctx, func(tx store.Store) error {
+		var err error
+		if e.Category, err = s.ensureCategory(ctx, tx, e.Category, now); err != nil {
+			return err
+		}
+		return tx.CreateExpense(ctx, e)
+	})
+	return e, err
 }
 
 // UpdateExpense edits an expense; a nil SpentAt keeps the recorded time.
@@ -143,7 +152,14 @@ func (s *Service) UpdateExpense(ctx context.Context, id int64, in ExpenseInput) 
 		return nil, err
 	}
 	e.UpdatedAt = now
-	return e, s.st.UpdateExpense(ctx, e)
+	err = s.st.InTx(ctx, func(tx store.Store) error {
+		var err error
+		if e.Category, err = s.ensureCategory(ctx, tx, e.Category, now); err != nil {
+			return err
+		}
+		return tx.UpdateExpense(ctx, e)
+	})
+	return e, err
 }
 
 // GetExpense returns one expense.
@@ -162,13 +178,94 @@ func (s *Service) ListExpenses(ctx context.Context, f model.ExpenseFilter) ([]mo
 	return s.st.ListExpenses(ctx, f)
 }
 
-// ExpenseSuggestions returns known categories and payment methods for autocomplete.
-func (s *Service) ExpenseSuggestions(ctx context.Context) (categories, payments []string, err error) {
-	if categories, err = s.st.ExpenseValues(ctx, "category"); err != nil {
-		return nil, nil, err
+// ExpensePayments returns payment methods used before (most used first) for autocomplete.
+func (s *Service) ExpensePayments(ctx context.Context) ([]string, error) {
+	return s.st.ExpenseValues(ctx, "payment")
+}
+
+// customCategoryPosition sorts user-added categories after the presets but before "Other".
+const customCategoryPosition = 900
+
+// CategoryInput creates or edits an expense category.
+type CategoryInput struct {
+	Name  string `json:"name"`
+	Emoji string `json:"emoji"`
+}
+
+func validCategory(in CategoryInput) (name, emoji string, err error) {
+	if name, err = cleanLabel(in.Name, "Category name"); err != nil {
+		return "", "", err
 	}
-	payments, err = s.st.ExpenseValues(ctx, "payment")
-	return categories, payments, err
+	if name == "" {
+		return "", "", model.Invalid("Category name is required")
+	}
+	emoji = strings.TrimSpace(in.Emoji)
+	if len([]rune(emoji)) > 12 || strings.ContainsAny(emoji, " <>&\"'") {
+		return "", "", model.Invalid("Use a single emoji (or leave it empty)")
+	}
+	return name, emoji, nil
+}
+
+// ensureCategory returns the stored spelling of a category, creating it when new.
+func (s *Service) ensureCategory(ctx context.Context, tx store.Store, name string, now time.Time) (string, error) {
+	if name == "" {
+		return "", nil
+	}
+	c, err := tx.FindExpenseCategory(ctx, name)
+	if err == nil {
+		return c.Name, nil
+	}
+	if !errors.Is(err, model.ErrNotFound) {
+		return "", err
+	}
+	return name, tx.CreateExpenseCategory(ctx, &model.ExpenseCategory{Name: name, Position: customCategoryPosition, CreatedAt: now})
+}
+
+// ListExpenseCategories returns the categories in display order.
+func (s *Service) ListExpenseCategories(ctx context.Context) ([]model.ExpenseCategory, error) {
+	return s.st.ListExpenseCategories(ctx)
+}
+
+// CreateExpenseCategory adds a category.
+func (s *Service) CreateExpenseCategory(ctx context.Context, in CategoryInput) (*model.ExpenseCategory, error) {
+	name, emoji, err := validCategory(in)
+	if err != nil {
+		return nil, err
+	}
+	c := &model.ExpenseCategory{Name: name, Emoji: emoji, Position: customCategoryPosition, CreatedAt: s.now().UTC()}
+	err = s.st.InTx(ctx, func(tx store.Store) error {
+		if _, err := tx.FindExpenseCategory(ctx, name); err == nil {
+			return model.Invalid("Category \u201c" + name + "\u201d already exists")
+		}
+		return tx.CreateExpenseCategory(ctx, c)
+	})
+	return c, err
+}
+
+// UpdateExpenseCategory renames a category (existing expenses follow) or changes its emoji.
+func (s *Service) UpdateExpenseCategory(ctx context.Context, id int64, in CategoryInput) (*model.ExpenseCategory, error) {
+	name, emoji, err := validCategory(in)
+	if err != nil {
+		return nil, err
+	}
+	var c *model.ExpenseCategory
+	err = s.st.InTx(ctx, func(tx store.Store) error {
+		if c, err = tx.GetExpenseCategory(ctx, id); err != nil {
+			return err
+		}
+		if other, err := tx.FindExpenseCategory(ctx, name); err == nil && other.ID != id {
+			return model.Invalid("Category \u201c" + name + "\u201d already exists")
+		}
+		old := c.Name
+		c.Name, c.Emoji = name, emoji
+		return tx.UpdateExpenseCategory(ctx, c, old)
+	})
+	return c, err
+}
+
+// DeleteExpenseCategory removes a category from the picker; expenses keep their category text.
+func (s *Service) DeleteExpenseCategory(ctx context.Context, id int64) error {
+	return s.st.DeleteExpenseCategory(ctx, id)
 }
 
 // LastCurrency is the currency of the most recent expense (default for new ones).

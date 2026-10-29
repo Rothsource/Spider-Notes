@@ -1,0 +1,40 @@
+{{define "content"}}
+<div class="narrow">
+  <a class="back-link" href="{{.Back}}">{{icon "left"}}Expenses</a>
+  <div class="page-head">
+    <h1>Expense categories</h1>
+  </div>
+
+  <form class="card form cat-add" method="post" action="/expense-categories">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <input type="hidden" name="back" value="{{.Back}}">
+    <div class="section-label">Add a category</div>
+    <div class="cat-edit">
+      <input name="emoji" maxlength="12" placeholder="🙂" aria-label="Emoji (optional)" class="cat-emoji-input">
+      <input name="name" required maxlength="60" placeholder="Category name, e.g. Coffee" aria-label="Category name" class="grow">
+      <button class="btn primary">{{icon "plus"}}Add</button>
+    </div>
+    <p class="hint">Tip: you can also type a new category straight from the expense form with <strong>＋ New</strong>.</p>
+  </form>
+
+  <div class="card list-card">
+    {{range .Categories}}
+    <div class="cat-row">
+      <form class="cat-edit grow" method="post" action="/expense-categories/{{.ID}}">
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+        <input type="hidden" name="back" value="{{$.Back}}">
+        <input name="emoji" value="{{.Emoji}}" maxlength="12" placeholder="🙂" aria-label="Emoji" class="cat-emoji-input">
+        <input name="name" value="{{.Name}}" required maxlength="60" aria-label="Name" class="grow">
+        <button class="btn small">Save</button>
+      </form>
+      <form method="post" action="/expense-categories/{{.ID}}/delete" data-confirm="Remove “{{.Name}}” from the list? Expenses already using it keep the name.">
+        <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+        <input type="hidden" name="back" value="{{$.Back}}">
+        <button class="icon-btn" title="Remove" aria-label="Remove {{.Name}}">{{icon "trash"}}</button>
+      </form>
+    </div>
+    {{else}}<p class="empty-note">No categories yet.</p>{{end}}
+  </div>
+  <p class="hint">Renaming a category also renames it on your existing expenses.</p>
+</div>
+{{end}}

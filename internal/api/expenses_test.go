@@ -37,6 +37,28 @@ func TestExpensesWebAndAPI(t *testing.T) {
 		t.Fatalf("edit: %d", code)
 	}
 
+	// Categories: preset chips on the add form, no date field, "+ New" creates one.
+	_, page := a.get("/expenses")
+	if !strings.Contains(page, `value="Food &amp; Drinks"`) || strings.Contains(page, `name="spent_at"`) {
+		t.Fatal("add form should show preset category chips and no date field")
+	}
+	if code, body, _ := a.postForm("/expenses", url.Values{"csrf_token": {csrf}, "item": {"Latte"}, "amount": {"2"},
+		"category": {"__new__"}, "category_new": {"Coffee"}}); code != http.StatusSeeOther {
+		t.Fatalf("new category from form: %d %s", code, body)
+	}
+	if _, body := a.get("/expense-categories"); !strings.Contains(body, `value="Coffee"`) {
+		t.Fatal("new category should be listed")
+	}
+	if code, _, _ := a.postForm("/expense-categories", url.Values{"csrf_token": {csrf}, "name": {"Pets"}, "emoji": {"🐶"}}); code != http.StatusSeeOther {
+		t.Fatalf("add category: %d", code)
+	}
+	if code, _, h := a.postForm("/expense-categories", url.Values{"csrf_token": {csrf}, "name": {"pets"}}); code != http.StatusSeeOther || !strings.Contains(h.Get("Location"), "err=") {
+		t.Fatalf("duplicate category should redirect with an error: %d %v", code, h)
+	}
+	if _, body := a.get("/expenses/1"); !strings.Contains(body, `name="spent_at"`) || !strings.Contains(body, "catpicker") && !strings.Contains(body, "cat-picker") {
+		t.Fatal("edit form should keep the date field and show the picker")
+	}
+
 	// Excel download from the web page.
 	resp, err := a.client.Get(a.srv.URL + "/expenses/export.xlsx?range=all")
 	if err != nil {
@@ -62,7 +84,7 @@ func TestExpensesWebAndAPI(t *testing.T) {
 		t.Fatalf("too many decimals: %d %v", code, out)
 	}
 	code, sum := a.apiCall("GET", "/expenses/summary", tok, nil)
-	if code != 200 || sum["count"].(float64) != 2 || len(sum["totals"].([]any)) != 2 {
+	if code != 200 || sum["count"].(float64) != 3 || len(sum["totals"].([]any)) != 2 {
 		t.Fatalf("summary: %d %v", code, sum)
 	}
 	if code, _ := a.apiCall("GET", "/expenses?from=2000-01-01&category=Transport", tok, nil); code != 200 {
@@ -77,6 +99,12 @@ func TestExpensesWebAndAPI(t *testing.T) {
 	_ = resp.Body.Close()
 	if resp.StatusCode != 200 || !strings.Contains(resp.Header.Get("Content-Disposition"), "expenses_2000-01-01_to_2099-12-31.xlsx") {
 		t.Fatalf("api export: %d %v", resp.StatusCode, resp.Header)
+	}
+	if code, c := a.apiCall("POST", "/expense-categories", tok, map[string]any{"name": "Fuel", "emoji": "⛽"}); code != http.StatusCreated || c["name"] != "Fuel" {
+		t.Fatalf("api category: %d %v", code, c)
+	}
+	if code, _ := a.apiCall("GET", "/expense-categories", tok, nil); code != 200 {
+		t.Fatalf("list categories: %d", code)
 	}
 	if code, _ := a.apiCall("DELETE", "/expenses/1", tok, nil); code != http.StatusNoContent {
 		t.Fatalf("delete: %d", code)

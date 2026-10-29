@@ -17,12 +17,14 @@
           {{range .Currencies}}<option value="{{.Code}}" {{if eq .Code $e.Currency}}selected{{end}}>{{.Code}} {{.Symbol}}</option>{{end}}
         </select>
       </label>
-      <label>{{icon "hash"}} Category<input name="category" value="{{$e.Category}}" list="exp-cats" maxlength="60" placeholder="Food, Transport…"></label>
       <label>Payment<input name="payment" value="{{$e.Payment}}" list="exp-pays" maxlength="60" placeholder="Cash, ABA, Card…"></label>
-      <label class="span-2">{{icon "clock"}} When<input type="datetime-local" name="spent_at" value="{{if not $e.SpentAt.IsZero}}{{dtlocal $e.SpentAt}}{{end}}"></label>
+      <label class="span-2">{{icon "clock"}} Date &amp; time <span class="muted">(recorded automatically; change only to correct it)</span><input type="datetime-local" name="spent_at" value="{{if not $e.SpentAt.IsZero}}{{dtlocal $e.SpentAt}}{{end}}"></label>
+    </div>
+    <div class="exp-cat-row">
+      <div class="section-label">Category <a class="exp-manage" href="/expense-categories?back={{.Back}}">Manage</a></div>
+      {{template "catpicker" (dict "Cats" .Categories "Sel" $e.Category)}}
     </div>
     <textarea name="note" rows="4" maxlength="20000" placeholder="Description (optional)" aria-label="Description" data-autosize>{{$e.Note}}</textarea>
-    <datalist id="exp-cats">{{range .Categories}}<option value="{{.}}">{{end}}</datalist>
     <datalist id="exp-pays">{{range .Payments}}<option value="{{.}}">{{end}}</datalist>
     <div class="form-actions">
       <a class="btn ghost" href="{{.Back}}">Cancel</a>

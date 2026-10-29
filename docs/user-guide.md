@@ -115,15 +115,21 @@ Track what you spend.
   - **Item**: what you spent on, e.g. *Lunch*.
   - **Amount** and **currency**: USD, KHR, THB or EUR. Commas are fine (`12,000`). USD, THB and EUR take
     up to 2 decimals; KHR takes none. The currency you used last is preselected.
-  - **Category** and **Payment** (e.g. *Food*, *ABA*): type anything; values you used before are suggested.
-  - **When**: leave it empty and the current date and time are recorded automatically.
+  - **Category**: tap a chip. Ready-made: 🍜 Food & Drinks, 🛒 Groceries, 🛺 Transport, 🛍️ Shopping,
+    💡 Bills, 🏠 Rent, 📱 Phone & Internet, 💊 Health, 📚 Education, 🎬 Entertainment, 👪 Family,
+    🎁 Gifts, ✈️ Travel, 📦 Other. Tap **＋ New** to type a new one; it is added to the list.
+  - **Payment** (optional, e.g. *Cash*, *ABA*): values you used before are suggested.
   - **Description**: optional notes.
+  - The **date and time are recorded automatically**; there is nothing to fill in.
+- **Manage** (next to *Category*) opens the category list: add one with an optional emoji,
+  rename it (existing expenses are renamed too), change its emoji, or remove it (expenses keep the name).
 - **Views**: Day / Week / Month (default) / Year / All, with ‹ › and a date picker.
   Filter by category or search the text.
 - The **summary** shows the total per currency and the number of expenses. Each day shows
   its own total. The right-hand panel breaks the period down **by category**; click a
   category to filter.
-- Click an expense to **edit** or **delete** it. Editing keeps the recorded time unless you change *When*.
+- Click an expense to **edit** or **delete** it. The edit page shows the recorded date and time;
+  change it only to correct a mistake.
 - **Export Excel** downloads the current view (same period, category and search) as an `.xlsx`
   file. It has two sheets:
 

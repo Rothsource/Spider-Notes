@@ -108,3 +108,12 @@ func FormatMoney(minor int64, code string) string {
 		return sign + c.Symbol + num
 	}
 }
+
+// ExpenseCategory is a category offered when recording an expense.
+type ExpenseCategory struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	Emoji     string    `json:"emoji"`
+	Position  int       `json:"position"`
+	CreatedAt time.Time `json:"created_at"`
+}

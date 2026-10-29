@@ -118,3 +118,78 @@ func (d *DB) ExpenseValues(ctx context.Context, column string) ([]string, error)
 func (d *DB) SoftDeleteExpense(ctx context.Context, id int64, at time.Time) error {
 	return checkAffected(d.q.ExecContext(ctx, `UPDATE expenses SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`, ft(at), ft(at), id))
 }
+
+// ---- expense categories ----
+
+const expCatCols = `id, name, emoji, position, created_at`
+
+func scanExpCat(sc interface{ Scan(...any) error }) (model.ExpenseCategory, error) {
+	var c model.ExpenseCategory
+	err := sc.Scan(&c.ID, &c.Name, &c.Emoji, &c.Position, ts(&c.CreatedAt))
+	return c, err
+}
+
+// ListExpenseCategories implements store.Expenses.
+func (d *DB) ListExpenseCategories(ctx context.Context) ([]model.ExpenseCategory, error) {
+	rows, err := d.q.QueryContext(ctx, `SELECT `+expCatCols+` FROM expense_categories ORDER BY position, name COLLATE NOCASE`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []model.ExpenseCategory
+	for rows.Next() {
+		c, err := scanExpCat(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// GetExpenseCategory implements store.Expenses.
+func (d *DB) GetExpenseCategory(ctx context.Context, id int64) (*model.ExpenseCategory, error) {
+	c, err := scanExpCat(d.q.QueryRowContext(ctx, `SELECT `+expCatCols+` FROM expense_categories WHERE id = ?`, id))
+	if err != nil {
+		return nil, notFound(err)
+	}
+	return &c, nil
+}
+
+// FindExpenseCategory implements store.Expenses (case-insensitive).
+func (d *DB) FindExpenseCategory(ctx context.Context, name string) (*model.ExpenseCategory, error) {
+	c, err := scanExpCat(d.q.QueryRowContext(ctx, `SELECT `+expCatCols+` FROM expense_categories WHERE name = ? COLLATE NOCASE`, name))
+	if err != nil {
+		return nil, notFound(err)
+	}
+	return &c, nil
+}
+
+// CreateExpenseCategory implements store.Expenses.
+func (d *DB) CreateExpenseCategory(ctx context.Context, c *model.ExpenseCategory) error {
+	res, err := d.q.ExecContext(ctx, `INSERT INTO expense_categories(name, emoji, position, created_at) VALUES (?,?,?,?)`,
+		c.Name, c.Emoji, c.Position, ft(c.CreatedAt))
+	if err != nil {
+		return err
+	}
+	c.ID, err = res.LastInsertId()
+	return err
+}
+
+// UpdateExpenseCategory implements store.Expenses. A rename also renames the
+// category on existing expenses.
+func (d *DB) UpdateExpenseCategory(ctx context.Context, c *model.ExpenseCategory, oldName string) error {
+	if err := checkAffected(d.q.ExecContext(ctx, `UPDATE expense_categories SET name=?, emoji=?, position=? WHERE id=?`, c.Name, c.Emoji, c.Position, c.ID)); err != nil {
+		return err
+	}
+	if oldName != c.Name {
+		_, err := d.q.ExecContext(ctx, `UPDATE expenses SET category = ? WHERE category = ?`, c.Name, oldName)
+		return err
+	}
+	return nil
+}
+
+// DeleteExpenseCategory implements store.Expenses. Existing expenses keep the name.
+func (d *DB) DeleteExpenseCategory(ctx context.Context, id int64) error {
+	return checkAffected(d.q.ExecContext(ctx, `DELETE FROM expense_categories WHERE id = ?`, id))
+}

@@ -65,7 +65,7 @@ There is exactly one user account. There is no sign-up and there are no roles.
 
 ### Expenses
 - Item, amount, currency (USD, KHR, THB, EUR), category, payment method and description.
-- Date and time are recorded automatically; set them yourself for past spending.
+- Ready-made categories with emoji, plus your own; date and time are recorded automatically.
 - Day / week / month / year / all views with totals per currency and a per-category breakdown.
 - **Export Excel** (.xlsx) of the current view: an *Expenses* sheet with filters and a *Summary* sheet.
 

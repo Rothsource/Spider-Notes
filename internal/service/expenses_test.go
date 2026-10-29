@@ -105,9 +105,8 @@ func TestExpenseLifecycle(t *testing.T) {
 	if sum.ByCategory[0].Category != "Food" || sum.ByCategory[0].Share != 1 {
 		t.Fatalf("by category %+v", sum.ByCategory)
 	}
-	cats, pays, _ := e.svc.ExpenseSuggestions(ctx)
-	if len(cats) != 2 || cats[0] != "Food" || len(pays) != 1 {
-		t.Fatalf("suggestions %v %v", cats, pays)
+	if pays, _ := e.svc.ExpensePayments(ctx); len(pays) != 1 || pays[0] != "Cash" {
+		t.Fatalf("payments %v", pays)
 	}
 	if e.svc.LastCurrency(ctx) != "USD" {
 		t.Fatal("last currency")
@@ -169,5 +168,57 @@ func TestExpenseInputJSON(t *testing.T) {
 		if err := json.Unmarshal([]byte(body), &in); err != nil || in.Amount.String() != "12.5" {
 			t.Fatalf("%s: %v %q", body, err, in.Amount)
 		}
+	}
+}
+
+func TestExpenseCategories(t *testing.T) {
+	e := newEnv(t, "2026-03-05 12:30")
+	ctx := context.Background()
+	cats, err := e.svc.ListExpenseCategories(ctx)
+	if err != nil || len(cats) < 10 || cats[0].Name != "Food & Drinks" || cats[0].Emoji == "" || cats[len(cats)-1].Name != "Other" {
+		t.Fatalf("preset categories: %v %+v", err, cats)
+	}
+	n := len(cats)
+
+	// Using an existing category with different case keeps the stored spelling.
+	x, err := e.svc.CreateExpense(ctx, ExpenseInput{Item: "Bus", Amount: "1", Category: "transport"})
+	if err != nil || x.Category != "Transport" {
+		t.Fatalf("canonical name: %v %q", err, x.Category)
+	}
+	// A new name typed on an expense becomes a category (before "Other").
+	if _, err := e.svc.CreateExpense(ctx, ExpenseInput{Item: "Latte", Amount: "2", Category: "Coffee"}); err != nil {
+		t.Fatal(err)
+	}
+	cats, _ = e.svc.ListExpenseCategories(ctx)
+	if len(cats) != n+1 || cats[len(cats)-2].Name != "Coffee" {
+		t.Fatalf("auto-created category: %+v", cats)
+	}
+
+	c, err := e.svc.CreateExpenseCategory(ctx, CategoryInput{Name: "Pets", Emoji: "🐶"})
+	if err != nil || c.Emoji != "🐶" {
+		t.Fatalf("create: %v %+v", err, c)
+	}
+	for _, in := range []CategoryInput{{Name: "pets"}, {Name: ""}, {Name: "x", Emoji: "<b>"}, {Name: strings.Repeat("a", 61)}} {
+		if _, err := e.svc.CreateExpenseCategory(ctx, in); !errors.Is(err, model.ErrValidation) {
+			t.Errorf("%+v should be rejected, got %v", in, err)
+		}
+	}
+	// Renaming carries existing expenses along.
+	coffee := cats[len(cats)-2]
+	if _, err := e.svc.UpdateExpenseCategory(ctx, coffee.ID, CategoryInput{Name: "Café", Emoji: "☕"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := e.svc.ListExpenses(ctx, model.ExpenseFilter{Category: "Café"}); len(got) != 1 {
+		t.Fatalf("rename should update expenses: %d", len(got))
+	}
+	if _, err := e.svc.UpdateExpenseCategory(ctx, coffee.ID, CategoryInput{Name: "Pets"}); !errors.Is(err, model.ErrValidation) {
+		t.Fatal("rename onto an existing name must fail")
+	}
+	// Deleting removes it from the picker but keeps the expense text.
+	if err := e.svc.DeleteExpenseCategory(ctx, coffee.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := e.svc.ListExpenses(ctx, model.ExpenseFilter{Category: "Café"}); len(got) != 1 {
+		t.Fatal("expense should keep its category after the category is removed")
 	}
 }

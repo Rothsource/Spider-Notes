@@ -77,10 +77,11 @@ An attachment with no folder, memo or note belongs to the top level of **Folders
 reminder tags are entered in a field. Tag names are lower-case.
 
 ### Expenses
-
-| Table | Key columns |
+| Table | Key columns | Notes |
+|---|---|---|
 |---|---|
-| `expenses` | item, amount_minor, currency (`USD`/`KHR`/`THB`/`EUR`), category, payment, note, spent_at, deleted_at |
+| `expenses` | item, amount_minor, currency (`USD`/`KHR`/`THB`/`EUR`), category, payment, note, spent_at, deleted_at | |
+| `expense_categories` | name (unique, case-insensitive), emoji, position | The category picker. Presets are added by the migration; `expenses.category` stores the name as text |
 
 `amount_minor` is an integer in the currency's smallest unit (USD cents, KHR riel), so
 totals are exact. The API also returns it as a decimal string in `amount`.

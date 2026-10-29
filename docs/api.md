@@ -87,8 +87,11 @@ the `X-CSRF-Token` header.
 | GET / PUT / DELETE | `/expenses/{id}` | Read / replace (omit `spent_at` to keep it) / delete |
 | GET | `/expenses/summary?from=&to=&category=&currency=&q=` | Totals per currency and per category |
 | GET | `/expenses/export.xlsx?from=&to=&category=&currency=&q=` | Excel download |
+| GET / POST | `/expense-categories` | List / add `{"name", "emoji"}` |
+| PUT / DELETE | `/expense-categories/{id}` | Rename or change emoji (expenses follow) / remove from the list |
 
-`amount` accepts a number (`12.5`) or a string (`"12.50"`).
+`amount` accepts a number (`12.5`) or a string (`"12.50"`). A `category` that does not exist yet
+is added to the category list; an existing one matches regardless of case.
 
 ### Views
 | Method | Path | Description |
