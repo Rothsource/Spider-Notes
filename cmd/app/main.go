@@ -20,6 +20,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	_ "time/tzdata" // zone database embedded, so APP_TIMEZONE works in minimal images
 
 	"github.com/sovannroth/mynotes"
 	"github.com/sovannroth/mynotes/internal/api"
