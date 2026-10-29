@@ -131,6 +131,8 @@ Track what you spend.
   category to filter.
 - Click an expense to **edit** or **delete** it. The edit page shows the recorded date and time;
   change it only to correct a mistake.
+- **From Telegram**: send the bot a message such as `lunch 4.5` or `tuk tuk 8000r #transport`;
+  see [Telegram › Expenses](telegram.md#expenses-from-telegram).
 - **Export Excel** downloads the current view (same period, category and search) as an `.xlsx`
   file. It has two sheets:
 

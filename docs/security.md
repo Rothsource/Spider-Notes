@@ -39,8 +39,11 @@ document describes how it protects that user's data and how the code is checked.
 
 ## Telegram
 
-- Only button presses from `TELEGRAM_CHAT_ID` are processed; other chats are ignored silently.
-- Callback data is validated against a strict pattern (`o:<id>:<action>`).
+- Only messages and button presses from `TELEGRAM_CHAT_ID` are processed; other chats are ignored silently
+  (no reply, nothing recorded).
+- Callback data is validated against strict patterns (`o:<id>:<action>` for reminders,
+  `e:<id>:<action>` for expenses).
+- Expense messages go through the same validation as the web form (amount format, lengths).
 - The bot token is redacted from all logs, including the Telegram library's own output.
 - Long polling means no inbound port or public webhook.
 

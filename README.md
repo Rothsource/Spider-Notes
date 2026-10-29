@@ -2,7 +2,8 @@
 
 Spider Notes is a self-hosted personal **to-do list, reminder, calendar and memo** app for one person.
 It is a single Go binary with SQLite, a server-rendered web UI (htmx), and a
-**send-only Telegram bot** that delivers reminders with ✅ Done / ⏰ Snooze / ⏭ Skip buttons.
+**Telegram bot** that delivers reminders with ✅ Done / ⏰ Snooze / ⏭ Skip buttons and
+lets you log expenses by sending a message such as `lunch 4.5`.
 
 - Times are scheduled and shown in `Asia/Phnom_Penh` (configurable).
 - Data stays on your server in one SQLite file.
@@ -110,7 +111,7 @@ override the environment.**
 ## How reminders behave
 
 - **Telegram message**: the message text, the linked task title, the scheduled time, `(reminder #3)` on nags, and buttons **✅ Done**, **⏰ 10m**, **⏰ 1h**, **⏭ Skip** (Skip only on repeating items). Pressing a button updates the database, stops nags, and edits the message to show the result (e.g. "✅ Done at 08:20") with the buttons removed. Actions taken in the web UI edit the Telegram message too.
-- **The bot accepts no commands.** It replies once with "This bot only sends reminders." to your own chat and ignores every other chat and every button press from anyone else.
+- **Only your chat counts.** The bot handles messages and button presses from `TELEGRAM_CHAT_ID` only and ignores every other chat. In your chat, a message like `lunch 4.5` records an expense (see [docs/telegram.md](docs/telegram.md#expenses-from-telegram)); `/today`, `/week`, `/month` show totals.
 - **Nag mode** re-sends every N minutes until the occurrence is Done or Snoozed. When a nag is sent, the previous message loses its buttons.
 - **Quiet hours** (global, e.g. `22:00–06:30`, plus a per-reminder override) hold messages and send them when quiet hours end. A reminder marked "ignore quiet hours" is always sent.
 - **Snooze**: 10 min, 30 min, 1 hour, or until tomorrow morning (time set in Settings).

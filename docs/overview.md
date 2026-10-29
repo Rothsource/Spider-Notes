@@ -83,7 +83,7 @@ There is exactly one user account. There is no sign-up and there are no roles.
 The following are intentionally not part of the current version. The API and
 schema are kept clean so they can be added later.
 
-- Telegram commands (the bot only sends reminders and handles buttons).
+- Creating tasks or reminders from Telegram (the bot sends reminders and records expenses).
 - Multiple users or shared spaces.
 - External calendar sync (Google Calendar, iCal).
 - AI features (the JSON API and OpenAPI file are ready for LLM tool use).

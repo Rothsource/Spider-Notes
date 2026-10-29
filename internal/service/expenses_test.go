@@ -222,3 +222,42 @@ func TestExpenseCategories(t *testing.T) {
 		t.Fatal("expense should keep its category after the category is removed")
 	}
 }
+
+func TestParseQuickExpense(t *testing.T) {
+	cases := []struct {
+		in                          string
+		item, amount, cur, cat, pay string
+	}{
+		{"lunch 4.5", "Lunch", "4.5", "", "", ""},
+		{"4.5 lunch", "Lunch", "4.5", "", "", ""},
+		{"tuk tuk 8000r", "Tuk tuk", "8000", "KHR", "", ""},
+		{"8,000៛ tuk tuk", "Tuk tuk", "8,000", "KHR", "", ""},
+		{"tuk tuk 8000 riel #transport", "Tuk tuk", "8000", "KHR", "transport", ""},
+		{"coffee $2.25 #food @aba", "Coffee", "2.25", "USD", "food", "aba"},
+		{"2 coffees 3.5", "2 coffees", "3.5", "", "", ""},
+		{"2 coffees $7 for team", "2 coffees for team", "7", "USD", "", ""},
+		{"rent 300 usd #rent @bank_transfer", "Rent", "300", "USD", "rent", "bank transfer"},
+		{"ការ៉េម 5000៛", "ការ៉េម", "5000", "KHR", "", ""},
+	}
+	for _, c := range cases {
+		q, err := ParseQuickExpense(c.in)
+		if err != nil || q.Item != c.item || q.Amount != c.amount || q.Currency != c.cur || q.Category != c.cat || q.Payment != c.pay {
+			t.Errorf("%q → %+v, %v", c.in, q, err)
+		}
+	}
+	for _, in := range []string{"hello", "5", "#food 5", ""} {
+		if _, err := ParseQuickExpense(in); !errors.Is(err, model.ErrValidation) {
+			t.Errorf("%q should fail", in)
+		}
+	}
+}
+
+func TestMatchCategory(t *testing.T) {
+	cats := []model.ExpenseCategory{{Name: "Food & Drinks"}, {Name: "Transport"}, {Name: "Phone & Internet"}, {Name: "Rent"}}
+	for q, want := range map[string]string{"food": "Food & Drinks", "drinks": "Food & Drinks", "TRANS": "Transport",
+		"internet": "Phone & Internet", "rent": "Rent", "coffee": "Coffee", "food&drinks": "Food & Drinks"} {
+		if got := MatchCategory(cats, q); got != want {
+			t.Errorf("MatchCategory(%q) = %q, want %q", q, got, want)
+		}
+	}
+}
