@@ -1,0 +1,8 @@
+/app
+/app.exe
+*.db
+*.db-wal
+*.db-shm
+/data/
+.env
+/export/
