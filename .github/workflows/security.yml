@@ -17,7 +17,7 @@ jobs:
     name: Known vulnerabilities (govulncheck)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -28,7 +28,7 @@ jobs:
     name: Static analysis (gosec)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -37,26 +37,30 @@ jobs:
       - run: gosec -exclude-dir=.claude ./...
 
   secrets:
-    name: Secret scan (gitleaks)
+    name: Secret scan (gitleaks, full history)
     runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.24.3
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # scan the full history, not just the last commit
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0 # every commit, not just the latest
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP" gitleaks
+      # Uses .gitleaks.toml (default rules + test-fixture allowlist).
+      - name: Scan
+        run: '"$RUNNER_TEMP/gitleaks" git --redact --verbose .'
 
   image:
     name: Container image scan (trivy)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build image
         run: docker build -t spider-notes:scan .
-      - uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: spider-notes:scan
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: "1"
+      - name: Scan image
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image \
+            --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 --no-progress spider-notes:scan
