@@ -137,7 +137,9 @@ func (s *Server) failBack(w http.ResponseWriter, r *http.Request, err error, bac
 func (s *Server) folderUpload(w http.ResponseWriter, r *http.Request) {
 	folder := formID(r, "folder_id")
 	back := folderURL(folder)
-	if err := r.ParseMultipartForm(8 << 20); err != nil {
+	// Up to 20 files of the maximum size per request (the server also caps bodies globally).
+	r.Body = http.MaxBytesReader(w, r.Body, 20*s.svc.MaxUploadBytes()+(1<<20))
+	if err := r.ParseMultipartForm(8 << 20); err != nil { // #nosec G120 -- body capped by MaxBytesReader above
 		s.failBack(w, r, model.Invalid(uploadErr(err, s.svc.MaxUploadBytes())), back)
 		return
 	}
@@ -309,6 +311,7 @@ func (s *Server) attachmentUpload(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(status)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, s.svc.MaxUploadBytes()+(1<<20))
 	f, fh, err := r.FormFile("file")
 	if err != nil {
 		writeErr(http.StatusBadRequest, uploadErr(err, s.svc.MaxUploadBytes()))
@@ -427,5 +430,5 @@ func (s *Server) attachmentAction(w http.ResponseWriter, r *http.Request) {
 // preview renders Markdown for the editor's Preview tab.
 func (s *Server) preview(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte(markdown.Render(r.FormValue("content"), false)))
+	_, _ = w.Write([]byte(markdown.Render(r.FormValue("content"), false))) // #nosec G705 -- output sanitized by bluemonday
 }

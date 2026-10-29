@@ -133,13 +133,13 @@ func (d *DB) ListNotes(ctx context.Context, folderID int64, all bool) ([]model.N
 	for rows.Next() {
 		n, err := scanNote(rows)
 		if err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, err
 		}
 		out = append(out, n)
 		ids = append(ids, n.ID)
 	}
-	rows.Close()
+	_ = rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}

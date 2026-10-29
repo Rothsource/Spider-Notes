@@ -237,13 +237,13 @@ func (d *DB) ListMemos(ctx context.Context, f model.MemoFilter, pinnedOnly bool)
 	for rows.Next() {
 		m, err := scanMemo(rows)
 		if err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, err
 		}
 		out = append(out, m)
 		ids = append(ids, m.ID)
 	}
-	rows.Close()
+	_ = rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}

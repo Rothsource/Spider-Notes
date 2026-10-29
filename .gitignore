@@ -1,8 +1,69 @@
-/app
-/app.exe
+# ---- Secrets: never commit ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+secrets/
+*.secret
+
+# ---- App data (database, uploads, exports, backups) ----
+/data/
 *.db
 *.db-wal
 *.db-shm
-/data/
-.env
+*.db-journal
+*.sqlite
+*.sqlite3
 /export/
+/attachments/
+backup-*.db
+memos-backup*/
+memos-import*/
+
+# ---- Build output ----
+/app
+/app.exe
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.*
+*.coverprofile
+spider-notes*.tgz
+spider-notes-image.tar
+*.tar
+
+# ---- Go ----
+/vendor/
+go.work
+go.work.sum
+
+# ---- Editors / OS ----
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Claude Code: shared settings are committed, personal ones are not ----
+.claude/settings.local.json
+.claude/*.local.*
+
+# ---- Logs / temp ----
+*.log
+tmp/
+.tmp/

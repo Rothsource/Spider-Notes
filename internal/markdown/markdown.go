@@ -44,7 +44,7 @@ func newPolicy() *bluemonday.Policy {
 func Render(src string, interactive bool) template.HTML {
 	var buf bytes.Buffer
 	if err := md.Convert([]byte(src), &buf); err != nil {
-		return template.HTML(template.HTMLEscapeString(src)) //nolint:gosec // escaped
+		return template.HTML(template.HTMLEscapeString(src)) // #nosec -- escaped
 	}
 	out := policy.SanitizeBytes(buf.Bytes())
 	n := 0
@@ -64,7 +64,7 @@ func Render(src string, interactive bool) template.HTML {
 		n++
 		return []byte(b.String())
 	})
-	return template.HTML(out) //nolint:gosec // sanitized by bluemonday
+	return template.HTML(out) // #nosec -- sanitized by bluemonday
 }
 
 // Sanitize returns sanitized HTML for already-HTML input (used in tests and snippets).

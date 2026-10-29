@@ -1,0 +1,7 @@
+# Secret scanning config (used by the gitleaks job in .github/workflows/security.yml).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Dummy credentials in tests"
+paths = ['''_test\.go$''']

@@ -244,7 +244,7 @@ func redirect(w http.ResponseWriter, r *http.Request, to, msg string) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	http.Redirect(w, r, to, http.StatusSeeOther)
+	http.Redirect(w, r, to, http.StatusSeeOther) // #nosec G710 -- targets are internal paths or validated by safeBack
 }
 
 // safeBack returns a local redirect target from the "back" form value.
@@ -334,15 +334,16 @@ func (s *Server) funcs() template.FuncMap {
 		"snippet": func(s string) template.HTML {
 			e := template.HTMLEscapeString(s)
 			e = strings.NewReplacer("\x02", "<mark>", "\x03", "</mark>").Replace(e)
-			return template.HTML(e) //nolint:gosec // escaped above
+			return template.HTML(e) // #nosec -- escaped above
 		},
 		"firstline": model.FirstLine,
 		"weekdays":  func() []string { return []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"} },
 		"rem7":      func(i int) int { return i % 7 },
 		"icon": func(name string) template.HTML {
 			// width/height keep icons small even if the stylesheet fails to load.
+			// #nosec G203 -- fixed markup; the icon name is escaped
 			return template.HTML(`<svg class="i" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><use href="/static/icons.svg?v=` +
-				s.assetV + `#` + template.HTMLEscapeString(name) + `"></use></svg>`) //nolint:gosec // name is escaped
+				s.assetV + `#` + template.HTMLEscapeString(name) + `"></use></svg>`) // #nosec -- name is escaped
 		},
 		// ago formats a time relative to now, Memos-style.
 		"ago": func(t any) string {

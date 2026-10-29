@@ -279,12 +279,12 @@ func (s *Service) ExportToDir(ctx context.Context) (int, error) {
 			return err
 		}
 		tmp := p + ".tmp"
-		f, err := os.Create(tmp) //nolint:gosec // path built from sanitized segments under exportDir
+		f, err := os.Create(tmp) // #nosec -- path built from sanitized segments under exportDir
 		if err != nil {
 			return err
 		}
 		if err := fn(f); err != nil {
-			f.Close()
+			_ = f.Close()
 			return err
 		}
 		if err := f.Close(); err != nil {

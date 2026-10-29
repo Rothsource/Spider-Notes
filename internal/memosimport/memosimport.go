@@ -154,6 +154,7 @@ func (r *reader) memos(ctx context.Context) ([]*memoRow, error) {
 	if !cols["content"] || !cols["created_ts"] {
 		return nil, errors.New("this does not look like a Memos database (table memo not found)")
 	}
+	// #nosec G201 -- column names come from pick(), a fixed allowlist checked against the schema
 	q := fmt.Sprintf(`SELECT id, %s, content, created_ts, %s, %s, %s FROM memo`,
 		pick(cols, "uid", "''"), pick(cols, "updated_ts", "created_ts"), pick(cols, "row_status", "'NORMAL'"), pick(cols, "pinned", "0"))
 	rows, err := r.db.QueryContext(ctx, q)
@@ -168,7 +169,7 @@ func (r *reader) memos(ctx context.Context) ([]*memoRow, error) {
 		var created, updated int64
 		var pinned int
 		if err := rows.Scan(&m.id, &uid, &m.content, &created, &updated, &status, &pinned); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, err
 		}
 		m.key = uid
@@ -181,7 +182,7 @@ func (r *reader) memos(ctx context.Context) ([]*memoRow, error) {
 		byID[m.id] = m
 		list = append(list, m)
 	}
-	rows.Close()
+	_ = rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -197,7 +198,7 @@ func (r *reader) memos(ctx context.Context) ([]*memoRow, error) {
 						byID[id].pinned = true
 					}
 				}
-				prow.Close()
+				_ = prow.Close()
 			}
 		}
 	}
@@ -211,7 +212,7 @@ func (r *reader) memos(ctx context.Context) ([]*memoRow, error) {
 		}
 	}
 	if r.fileTbl != "" {
-		frows, err := r.db.QueryContext(ctx, `SELECT id, memo_id, filename FROM `+r.fileTbl+` WHERE memo_id IS NOT NULL ORDER BY id`)
+		frows, err := r.db.QueryContext(ctx, `SELECT id, memo_id, filename FROM `+r.fileTbl+` WHERE memo_id IS NOT NULL ORDER BY id`) // #nosec G202 -- table name from a fixed list
 		if err != nil {
 			return nil, err
 		}
@@ -219,7 +220,7 @@ func (r *reader) memos(ctx context.Context) ([]*memoRow, error) {
 			var id, memoID int64
 			var name string
 			if err := frows.Scan(&id, &memoID, &name); err != nil {
-				frows.Close()
+				_ = frows.Close()
 				return nil, err
 			}
 			if m := byID[memoID]; m != nil {
@@ -227,7 +228,7 @@ func (r *reader) memos(ctx context.Context) ([]*memoRow, error) {
 				m.fileNames = append(m.fileNames, name)
 			}
 		}
-		frows.Close()
+		_ = frows.Close()
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].created.Before(list[j].created) })
 	return list, nil
@@ -283,7 +284,7 @@ func (r *reader) openFile(ctx context.Context, id int64) (io.ReadCloser, error) 
 		if rel, err := filepath.Rel(r.dir, clean); err != nil || strings.HasPrefix(rel, "..") {
 			continue // never read outside the data folder
 		}
-		if f, err := os.Open(clean); err == nil { //nolint:gosec // confined to the data folder above
+		if f, err := os.Open(clean); err == nil { // #nosec -- confined to the data folder above
 			return f, nil
 		}
 	}

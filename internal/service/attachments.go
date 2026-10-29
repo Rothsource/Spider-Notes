@@ -200,7 +200,7 @@ func (s *Service) OpenAttachment(ctx context.Context, id int64) (*model.Attachme
 	if rel, err := filepath.Rel(s.attachDir, p); err != nil || strings.HasPrefix(rel, "..") {
 		return nil, nil, model.ErrNotFound
 	}
-	f, err := os.Open(p) //nolint:gosec // path built from a server-generated key, checked above
+	f, err := os.Open(p) // #nosec -- path built from a server-generated key, checked above
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil, model.ErrNotFound

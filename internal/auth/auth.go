@@ -156,6 +156,7 @@ func (m *Manager) startSession(ctx context.Context, w http.ResponseWriter, r *ht
 		return err
 	}
 	_ = m.st.DeleteSessionsIdleSince(ctx, now.Add(-m.idle))
+	// #nosec G124 -- Secure is set whenever the request arrived over HTTPS; plain HTTP must work on private networks.
 	http.SetCookie(w, &http.Cookie{Name: SessionCookie, Value: tok + "." + m.sign(tok), Path: "/", HttpOnly: true,
 		Secure: m.IsSecure(r), SameSite: http.SameSiteLaxMode})
 	return nil
@@ -166,6 +167,7 @@ func (m *Manager) Logout(ctx context.Context, w http.ResponseWriter, r *http.Req
 	if s := SessionFrom(ctx); s != nil {
 		_ = m.st.DeleteSession(ctx, s.IDHash)
 	}
+	// #nosec G124 -- see startSession.
 	http.SetCookie(w, &http.Cookie{Name: SessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true,
 		Secure: m.IsSecure(r), SameSite: http.SameSiteLaxMode})
 }
@@ -343,6 +345,7 @@ func (m *Manager) LoginCSRFToken(w http.ResponseWriter, r *http.Request) string 
 		}
 	}
 	v := randomToken(18)
+	// #nosec G124 -- see startSession.
 	http.SetCookie(w, &http.Cookie{Name: LoginCSRF, Value: v + "." + m.sign(v), Path: "/login", HttpOnly: true,
 		Secure: m.IsSecure(r), SameSite: http.SameSiteStrictMode})
 	return v

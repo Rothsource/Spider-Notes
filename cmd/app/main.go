@@ -233,7 +233,7 @@ func healthcheck() error {
 		host = "127.0.0.1"
 	}
 	c := &http.Client{Timeout: 3 * time.Second}
-	resp, err := c.Get("http://" + net.JoinHostPort(host, port) + "/healthz")
+	resp, err := c.Get("http://" + net.JoinHostPort(host, port) + "/healthz") // #nosec G704 -- local address from APP_LISTEN, not user input
 	if err != nil {
 		return err
 	}

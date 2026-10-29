@@ -158,13 +158,13 @@ func (d *DB) queryTasks(ctx context.Context, q string, args ...any) ([]model.Tas
 	for rows.Next() {
 		t, err := scanTask(rows)
 		if err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, err
 		}
 		out = append(out, t)
 		ids = append(ids, t.ID)
 	}
-	rows.Close()
+	_ = rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -296,13 +296,13 @@ func (d *DB) queryReminders(ctx context.Context, q string, args ...any) ([]model
 	for rows.Next() {
 		r, err := scanReminder(rows)
 		if err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, err
 		}
 		out = append(out, r)
 		ids = append(ids, r.ID)
 	}
-	rows.Close()
+	_ = rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}

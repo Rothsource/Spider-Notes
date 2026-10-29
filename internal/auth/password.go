@@ -58,7 +58,7 @@ func VerifyPassword(hash, pw string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	got := argon2.IDKey([]byte(pw), salt, t, mem, p, uint32(len(want))) //nolint:gosec // len bounded by stored hash
+	got := argon2.IDKey([]byte(pw), salt, t, mem, p, uint32(len(want))) // #nosec -- len bounded by stored hash
 	return subtle.ConstantTimeCompare(got, want) == 1, nil
 }
 

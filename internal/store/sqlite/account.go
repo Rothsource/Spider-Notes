@@ -140,7 +140,7 @@ func (d *DB) CreateToken(ctx context.Context, t *model.APIToken) error {
 	return err
 }
 
-const tokenCols = `id, name, token_hash, last_used_at, created_at, revoked_at`
+const tokenCols = `id, name, token_hash, last_used_at, created_at, revoked_at` // #nosec G101 -- column names, not a credential
 
 func scanToken(sc interface{ Scan(...any) error }) (*model.APIToken, error) {
 	t := &model.APIToken{}
