@@ -196,16 +196,19 @@
 {{end}}
 {{end}}{{end}}
 
-{{/* Expense category chips. Args: Cats ([]ExpenseCategory), Sel (selected name). */}}
+{{/* Expense category dropdown. Args: Cats ([]ExpenseCategory), Sel (selected name), Back (return URL). */}}
 {{define "catpicker"}}
-<div class="cat-picker" data-switch role="radiogroup" aria-label="Category">
+<div class="cat-field" data-switch>
+  <span class="cat-field-head"><label for="cat-select">Category</label><a class="exp-manage" href="/expense-categories?back={{.Back}}">Manage</a></span>
   {{$sel := .Sel}}{{$found := eq $sel ""}}
-  <label><input type="radio" name="category" value="" data-switch-source {{if eq $sel ""}}checked{{end}}><span class="muted">None</span></label>
-  {{range .Cats}}{{if eq $sel .Name}}{{$found = true}}{{end}}
-  <label><input type="radio" name="category" value="{{.Name}}" data-switch-source {{if eq $sel .Name}}checked{{end}}><span>{{with .Emoji}}<b class="cat-emoji">{{.}}</b>{{end}}{{.Name}}</span></label>
-  {{end}}
-  {{if not $found}}<label><input type="radio" name="category" value="{{$sel}}" data-switch-source checked><span>{{$sel}}</span></label>{{end}}
-  <label><input type="radio" name="category" value="__new__" data-switch-source><span>{{icon "plus"}}New</span></label>
-  <input name="category_new" maxlength="60" placeholder="New category name, e.g. Coffee" aria-label="New category name" class="cat-new" data-show="__new__">
+  <select name="category" id="cat-select" data-switch-source>
+    <option value="" {{if eq $sel ""}}selected{{end}}>Choose a category…</option>
+    {{range .Cats}}{{if eq $sel .Name}}{{$found = true}}{{end}}
+    <option value="{{.Name}}" {{if eq $sel .Name}}selected{{end}}>{{with .Emoji}}{{.}}  {{end}}{{.Name}}</option>
+    {{end}}
+    {{if not $found}}<option value="{{$sel}}" selected>{{$sel}}</option>{{end}}
+    <option value="__new__">＋ New category…</option>
+  </select>
+  <input name="category_new" maxlength="60" placeholder="New category name, e.g. Coffee" aria-label="New category name" data-show="__new__">
 </div>
 {{end}}

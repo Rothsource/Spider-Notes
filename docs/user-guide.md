@@ -115,13 +115,14 @@ Track what you spend.
   - **Item**: what you spent on, e.g. *Lunch*.
   - **Amount** and **currency**: USD, KHR, THB or EUR. Commas are fine (`12,000`). USD, THB and EUR take
     up to 2 decimals; KHR takes none. The currency you used last is preselected.
-  - **Category**: tap a chip. Ready-made: 🍜 Food & Drinks, 🛒 Groceries, 🛺 Transport, 🛍️ Shopping,
+  - **Category**: click the box to open the list. Ready-made: 🍜 Food & Drinks, 🛒 Groceries, 🛺 Transport, 🛍️ Shopping,
     💡 Bills, 🏠 Rent, 📱 Phone & Internet, 💊 Health, 📚 Education, 🎬 Entertainment, 👪 Family,
-    🎁 Gifts, ✈️ Travel, 📦 Other. Tap **＋ New** to type a new one; it is added to the list.
+    🎁 Gifts, ✈️ Travel, 📦 Other. Choose **＋ New category…** at the bottom of the list to type a new one;
+    it is added to the list.
   - **Payment** (optional, e.g. *Cash*, *ABA*): values you used before are suggested.
   - **Description**: optional notes.
   - The **date and time are recorded automatically**; there is nothing to fill in.
-- **Manage** (next to *Category*) opens the category list: add one with an optional emoji,
+- **Manage** (above the category box) opens the category list: add one with an optional emoji,
   rename it (existing expenses are renamed too), change its emoji, or remove it (expenses keep the name).
 - **Views**: Day / Week / Month (default) / Year / All, with ‹ › and a date picker.
   Filter by category or search the text.

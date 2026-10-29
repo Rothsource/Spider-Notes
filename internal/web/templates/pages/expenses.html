@@ -24,11 +24,8 @@
           {{range .Currencies}}<option value="{{.Code}}" {{if eq .Code $.Currency}}selected{{end}}>{{.Code}} {{.Symbol}}</option>{{end}}
         </select>
       </div>
-      <div class="exp-cat-row">
-        <div class="section-label">Category <a class="exp-manage" href="/expense-categories?back={{.Back}}">Manage</a></div>
-        {{template "catpicker" (dict "Cats" .Categories "Sel" "")}}
-      </div>
       <div class="field-grid">
+        {{template "catpicker" (dict "Cats" .Categories "Sel" "" "Back" .Back)}}
         <label>{{icon "wallet"}} Payment <span class="muted">(optional)</span><input name="payment" list="exp-pays" maxlength="60" placeholder="Cash, ABA, Card…"></label>
       </div>
       <textarea name="note" rows="2" maxlength="20000" placeholder="Description (optional)" aria-label="Description" data-autosize></textarea>

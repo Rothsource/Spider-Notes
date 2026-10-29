@@ -39,7 +39,7 @@ func TestExpensesWebAndAPI(t *testing.T) {
 
 	// Categories: preset chips on the add form, no date field, "+ New" creates one.
 	_, page := a.get("/expenses")
-	if !strings.Contains(page, `value="Food &amp; Drinks"`) || strings.Contains(page, `name="spent_at"`) {
+	if !strings.Contains(page, `<option value="Food &amp; Drinks"`) || strings.Contains(page, `name="spent_at"`) {
 		t.Fatal("add form should show preset category chips and no date field")
 	}
 	if code, body, _ := a.postForm("/expenses", url.Values{"csrf_token": {csrf}, "item": {"Latte"}, "amount": {"2"},
@@ -55,7 +55,7 @@ func TestExpensesWebAndAPI(t *testing.T) {
 	if code, _, h := a.postForm("/expense-categories", url.Values{"csrf_token": {csrf}, "name": {"pets"}}); code != http.StatusSeeOther || !strings.Contains(h.Get("Location"), "err=") {
 		t.Fatalf("duplicate category should redirect with an error: %d %v", code, h)
 	}
-	if _, body := a.get("/expenses/1"); !strings.Contains(body, `name="spent_at"`) || !strings.Contains(body, "catpicker") && !strings.Contains(body, "cat-picker") {
+	if _, body := a.get("/expenses/1"); !strings.Contains(body, `name="spent_at"`) || !strings.Contains(body, `id="cat-select"`) {
 		t.Fatal("edit form should keep the date field and show the picker")
 	}
 
