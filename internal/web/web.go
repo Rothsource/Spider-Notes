@@ -4,7 +4,9 @@ package web
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"html/template"
@@ -40,11 +42,31 @@ type Server struct {
 	partials *template.Template
 	openapi  []byte
 	version  string
+	assetV   string // content hash of static files, appended to asset URLs for cache busting
+}
+
+// assetVersion hashes all embedded static files so asset URLs change whenever their content does.
+func assetVersion() string {
+	h := sha256.New()
+	_ = fs.WalkDir(assets, "static", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		b, err := fs.ReadFile(assets, p)
+		if err != nil {
+			return err
+		}
+		h.Write([]byte(p))
+		h.Write(b)
+		return nil
+	})
+	return hex.EncodeToString(h.Sum(nil))[:10]
 }
 
 // New parses templates and returns the server.
 func New(svc *service.Service, am *auth.Manager, tg TelegramTester, openapi []byte, version string) (*Server, error) {
-	s := &Server{svc: svc, auth: am, tg: tg, loc: svc.Location(), pages: map[string]*template.Template{}, openapi: openapi, version: version}
+	s := &Server{svc: svc, auth: am, tg: tg, loc: svc.Location(), pages: map[string]*template.Template{}, openapi: openapi, version: version,
+		assetV: assetVersion()}
 	funcs := s.funcs()
 	base := []string{"templates/layout.html", "templates/partials.html"}
 	var err error
@@ -71,7 +93,12 @@ func (s *Server) Register(mux *http.ServeMux) {
 	static, _ := fs.Sub(assets, "static")
 	fileServer := http.StripPrefix("/static/", http.FileServer(http.FS(static)))
 	mux.Handle("GET /static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=3600")
+		// Versioned URLs (?v=<content hash>) never change; anything else must be revalidated.
+		if r.URL.Query().Get("v") == s.assetV {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
 		fileServer.ServeHTTP(w, r)
 	}))
 	mux.HandleFunc("GET /login", s.loginPage)
@@ -139,6 +166,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 	data["Now"] = s.svc.Now()
 	data["Version"] = s.version
 	data["TZ"] = s.loc.String()
+	data["V"] = s.assetV
 	if _, ok := data["Msg"]; !ok {
 		data["Msg"] = r.URL.Query().Get("msg")
 	}
@@ -308,7 +336,9 @@ func (s *Server) funcs() template.FuncMap {
 		"weekdays":  func() []string { return []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"} },
 		"rem7":      func(i int) int { return i % 7 },
 		"icon": func(name string) template.HTML {
-			return template.HTML(`<svg class="i" aria-hidden="true"><use href="/static/icons.svg#` + template.HTMLEscapeString(name) + `"></use></svg>`) //nolint:gosec // name is escaped
+			// width/height keep icons small even if the stylesheet fails to load.
+			return template.HTML(`<svg class="i" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><use href="/static/icons.svg?v=` +
+				s.assetV + `#` + template.HTMLEscapeString(name) + `"></use></svg>`) //nolint:gosec // name is escaped
 		},
 		// ago formats a time relative to now, Memos-style.
 		"ago": func(t any) string {
