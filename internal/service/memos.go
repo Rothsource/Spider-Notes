@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/sovannroth/mynotes/internal/markdown"
@@ -113,6 +114,19 @@ func (s *Service) ListMemos(ctx context.Context, f model.MemoFilter) ([]model.Me
 // PinnedMemos returns pinned memos.
 func (s *Service) PinnedMemos(ctx context.Context) ([]model.Memo, error) {
 	return s.st.ListMemos(ctx, model.MemoFilter{Limit: 100}, true)
+}
+
+// MemoCounts returns the number of memos per local day (YYYY-MM-DD) in [from, to).
+func (s *Service) MemoCounts(ctx context.Context, from, to time.Time) (map[string]int, error) {
+	memos, err := s.st.ListMemos(ctx, model.MemoFilter{From: &from, To: &to, Limit: 5000}, false)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]int{}
+	for _, m := range memos {
+		out[m.CreatedAt.In(s.loc).Format("2006-01-02")]++
+	}
+	return out, nil
 }
 
 // TagCounts returns tag usage counts ("memo", "task", "reminder" or "" for all).

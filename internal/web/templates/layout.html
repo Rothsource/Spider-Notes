@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="csrf-token" content="{{.CSRF}}">
 <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false}'>
 <meta name="color-scheme" content="light dark">
-<title>{{.Title}} · Mynotes</title>
+<title>{{.Title}} · Spider Notes</title>
 <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/theme.js"></script>
@@ -15,35 +15,56 @@
 </head>
 <body>
 {{if .CSRF}}
-<header class="topbar">
-  <a class="brand" href="/">📝 Mynotes</a>
-  <nav class="nav">
-    <a href="/" {{if eq .Path "/"}}class="active"{{end}}>Today</a>
-    <a href="/tasks" {{if eq .Path "/tasks"}}class="active"{{end}}>Tasks</a>
-    <a href="/reminders" {{if eq .Path "/reminders"}}class="active"{{end}}>Reminders</a>
-    <a href="/calendar" {{if eq .Path "/calendar"}}class="active"{{end}}>Calendar</a>
-    <a href="/memos" {{if eq .Path "/memos"}}class="active"{{end}}>Memos</a>
-    <a href="/history" {{if eq .Path "/history"}}class="active"{{end}}>History</a>
-  </nav>
-  <form class="search" action="/search" method="get" role="search">
-    <input type="search" name="q" placeholder="Search…" aria-label="Search" value="{{if eq .Path "/search"}}{{.Q}}{{end}}">
-  </form>
-  <div class="topbar-right">
-    <button type="button" class="icon-btn" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">◐</button>
-    <a href="/settings" class="icon-btn {{if eq .Path "/settings"}}active{{end}}" title="Settings" aria-label="Settings">⚙</a>
-    <form method="post" action="/logout" class="inline">
-      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
-      <button class="icon-btn" title="Log out" aria-label="Log out">⎋</button>
-    </form>
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <a class="sb-brand" href="/">
+      <span class="sb-logo">{{icon "spider"}}</span>
+      <span>Spider Notes</span>
+    </a>
+    <nav class="sb-nav">
+      <a href="/" class="sb-link {{if eq .Path "/"}}active{{end}}">{{icon "home"}}<span>Today</span>{{with .OpenCount}}<span class="sb-count">{{.}}</span>{{end}}</a>
+      <a href="/memos" class="sb-link {{if prefix .Path "/memos"}}active{{end}}">{{icon "memo"}}<span>Memos</span></a>
+      <a href="/tasks" class="sb-link {{if prefix .Path "/tasks"}}active{{end}}">{{icon "tasks"}}<span>Tasks</span></a>
+      <a href="/reminders" class="sb-link {{if prefix .Path "/reminders"}}active{{end}}">{{icon "bell"}}<span>Reminders</span></a>
+      <a href="/calendar" class="sb-link {{if prefix .Path "/calendar"}}active{{end}}">{{icon "calendar"}}<span>Calendar</span></a>
+      <a href="/history" class="sb-link {{if prefix .Path "/history"}}active{{end}}">{{icon "history"}}<span>History</span></a>
+      <a href="/search" class="sb-link {{if prefix .Path "/search"}}active{{end}}">{{icon "search"}}<span>Search</span></a>
+    </nav>
+    <div class="sb-bottom">
+      <a href="/settings" class="sb-link {{if prefix .Path "/settings"}}active{{end}}">{{icon "settings"}}<span>Settings</span></a>
+      <button type="button" class="sb-link" id="theme-toggle">{{icon "moon"}}<span>Theme</span><span class="sb-hint" id="theme-label"></span></button>
+      <div class="sb-user">
+        <span class="avatar">{{with .User}}{{initial .}}{{else}}?{{end}}</span>
+        <span class="sb-name">{{.User}}</span>
+        <form method="post" action="/logout" class="inline">
+          <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+          <button class="icon-btn" title="Log out" aria-label="Log out">{{icon "logout"}}</button>
+        </form>
+      </div>
+    </div>
+  </aside>
+  <div class="sb-backdrop" data-close-sidebar></div>
+
+  <div class="main">
+    <header class="mobile-bar">
+      <button type="button" class="icon-btn" data-open-sidebar aria-label="Open menu">{{icon "menu"}}</button>
+      <span class="mobile-title">{{.Title}}</span>
+      <a href="/search" class="icon-btn" aria-label="Search">{{icon "search"}}</a>
+    </header>
+    <main class="content">
+      {{with .Msg}}<div class="flash ok" role="status">{{icon "check"}}<span>{{.}}</span></div>{{end}}
+      {{with .Error}}<div class="flash err" role="alert">{{icon "alert"}}<span>{{.}}</span></div>{{end}}
+      {{template "content" .}}
+    </main>
+    <footer class="footer">Spider Notes · times in {{.TZ}} · {{.Version}}</footer>
   </div>
-</header>
-{{end}}
-<main class="container">
-  {{with .Msg}}<div class="flash ok" role="status">{{.}}</div>{{end}}
-  {{with .Error}}<div class="flash err" role="alert">{{.}}</div>{{end}}
+</div>
+{{else}}
+<main class="auth-page">
+  {{with .Error}}<div class="flash err" role="alert">{{icon "alert"}}<span>{{.}}</span></div>{{end}}
   {{template "content" .}}
 </main>
-{{if .CSRF}}<footer class="footer">Times in {{.TZ}} · {{.Version}}</footer>{{end}}
+{{end}}
 <div id="toast" class="toast" hidden></div>
 </body>
 </html>{{end}}

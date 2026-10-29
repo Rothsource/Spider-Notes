@@ -1,7 +1,11 @@
 {{define "content"}}
 <div class="login-wrap">
+  <div class="login-brand">
+    <span class="login-logo">{{icon "spider"}}</span>
+    <h1>Spider Notes</h1>
+    <p class="muted">Your tasks, reminders and memos, in one web.</p>
+  </div>
   <form class="card login" method="post" action="/login">
-    <h1>📝 Mynotes</h1>
     <input type="hidden" name="csrf_token" value="{{.LoginCSRF}}">
     <label>Username
       <input name="username" autocomplete="username" required autofocus value="{{with .Username}}{{.}}{{end}}">
@@ -9,7 +13,7 @@
     <label>Password
       <input name="password" type="password" autocomplete="current-password" required>
     </label>
-    <button class="btn primary block">Log in</button>
+    <button class="btn primary block">Sign in</button>
   </form>
 </div>
 {{end}}

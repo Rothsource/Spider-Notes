@@ -319,6 +319,19 @@ func (m *Manager) RequireAPI(onFail func(w http.ResponseWriter, status int, code
 	}
 }
 
+// Username returns the logged-in user's name ("" when unknown).
+func (m *Manager) Username(ctx context.Context) string {
+	s := SessionFrom(ctx)
+	if s == nil {
+		return ""
+	}
+	u, err := m.st.GetUser(ctx, s.UserID)
+	if err != nil {
+		return ""
+	}
+	return u.Username
+}
+
 // IsLoggedIn reports whether the request carries a valid session.
 func (m *Manager) IsLoggedIn(r *http.Request) bool { return m.session(r) != nil }
 

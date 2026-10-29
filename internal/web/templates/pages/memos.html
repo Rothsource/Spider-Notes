@@ -1,46 +1,62 @@
 {{define "content"}}
-<div class="memos-layout">
-  <div class="memos-main">
-    <form class="card capture" hx-post="/memos" hx-target="#memo-new" hx-swap="afterbegin" id="capture-form">
-      <textarea name="content" class="memo-input" rows="3" maxlength="20000" required
-        placeholder="What's on your mind? Use #tags, - [ ] checkboxes, **Markdown**. Enter to save, Shift+Enter for a new line." data-enter-submit autofocus></textarea>
-      <div class="row between">
-        <span class="muted small">Markdown · #tags · Enter to save</span>
-        <button class="btn primary">Save</button>
+<div class="with-rail">
+  <div class="feed">
+    <form class="memo editor" hx-post="/memos" hx-target="#memo-new" hx-swap="afterbegin" id="capture-form">
+      <textarea name="content" class="editor-input" rows="3" maxlength="20000" required data-autosize data-enter-submit autofocus
+        placeholder="Any thoughts…"></textarea>
+      <div class="editor-bar">
+        {{template "editor-tools"}}
+        <span class="grow"></span>
+        <span class="editor-hint">Enter to save · Shift+Enter new line</span>
+        <button class="btn primary" data-requires-text>{{icon "send"}}Save</button>
       </div>
     </form>
 
-    <form class="row gap" method="get" action="/memos">
-      <input type="search" name="q" value="{{.Q}}" placeholder="Search memos" class="grow" aria-label="Search memos">
-      {{if .Tag}}<input type="hidden" name="tag" value="{{.Tag}}">{{end}}
-      <button class="btn">Search</button>
-    </form>
     {{if or .Tag .Q .Date}}
-    <p class="filter-note">
-      Showing {{if .Tag}}<span class="tag">#{{.Tag}}</span>{{end}}{{if .Q}} matching “{{.Q}}”{{end}}{{if .Date}} on {{.Date}}{{end}}
-      · <a href="/memos">clear</a>
-    </p>
+    <div class="filter-bar">
+      <span class="muted">Filter:</span>
+      {{if .Tag}}<span class="chip-on">{{icon "hash"}}{{.Tag}}</span>{{end}}
+      {{if .Q}}<span class="chip-on">{{icon "search"}}{{.Q}}</span>{{end}}
+      {{if .Date}}<span class="chip-on">{{icon "calendar"}}{{.Date}}</span>{{end}}
+      <a class="chip-clear" href="/memos">{{icon "x"}}Clear</a>
+    </div>
     {{end}}
 
-    {{if .Pinned}}
-    <section class="pinned-list">
-      <h3 class="day-head">📌 Pinned</h3>
-      {{range .Pinned}}{{template "memo" (dict "Data" . "CSRF" $.CSRF)}}{{end}}
-    </section>
-    {{end}}
+    {{range .Pinned}}{{template "memo" (dict "Data" . "CSRF" $.CSRF)}}{{end}}
 
     <div id="memo-new"></div>
     <div id="timeline">
       {{template "memopage" (dict "Data" .Page "CSRF" .CSRF)}}
-      {{if not .Page.Groups}}<p class="muted empty">No memos yet.</p>{{end}}
+      {{if not .Page.Groups}}<div class="empty">{{icon "memo"}}<p>No memos yet. Write your first thought above.</p></div>{{end}}
     </div>
   </div>
-  <aside class="tag-sidebar card">
-    <h3>Tags</h3>
-    <ul class="plain-list">
-      <li><a href="/memos" {{if not .Tag}}class="active"{{end}}>All memos</a></li>
-      {{range .Tags}}<li><a href="/memos?tag={{.Name}}" {{if eq $.Tag .Name}}class="active"{{end}}>#{{.Name}} <span class="muted">{{.Count}}</span></a></li>{{end}}
-    </ul>
+
+  <aside class="rail mobile-top">
+    <form class="rail-search" method="get" action="/memos">
+      {{icon "search"}}
+      <input type="search" name="q" value="{{.Q}}" placeholder="Search memos" aria-label="Search memos">
+      {{if .Tag}}<input type="hidden" name="tag" value="{{.Tag}}">{{end}}
+    </form>
+
+    <div class="rail-card">
+      <div class="stats-row">
+        <div><strong>{{.Stats.Memos}}</strong><span>memos</span></div>
+        <div><strong>{{.Stats.Tags}}</strong><span>tags</span></div>
+        <div><strong>{{.Stats.Days}}</strong><span>days</span></div>
+      </div>
+      <div class="heatmap" aria-label="Memo activity, last weeks">
+        {{range .Heat}}<div class="heat-col">{{range .}}{{if .Future}}<span class="heat-cell future"></span>{{else}}<a class="heat-cell l{{.Level}} {{if .Today}}today{{end}}" href="/memos?date={{.ISO}}" title="{{.ISO}}: {{.Count}} memo(s)"></a>{{end}}{{end}}</div>{{end}}
+      </div>
+    </div>
+
+    <div class="rail-section">
+      <div class="section-label">Tags</div>
+      {{if .Tags}}
+      <div class="tag-cloud">
+        {{range .Tags}}<a class="tag-link {{if eq $.Tag .Name}}active{{end}}" href="/memos?tag={{.Name}}">{{icon "hash"}}{{.Name}}<span>{{.Count}}</span></a>{{end}}
+      </div>
+      {{else}}<p class="empty-note">Type <code>#tag</code> in a memo to organise it.</p>{{end}}
+    </div>
   </aside>
 </div>
 {{end}}

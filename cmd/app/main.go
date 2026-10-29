@@ -1,4 +1,4 @@
-// Command app runs the Mynotes server and its maintenance subcommands.
+// Command app runs the Spider Notes server and its maintenance subcommands.
 //
 //	app [serve]                     start the web server, scheduler and Telegram bot
 //	app backup [--out PATH]         write a consistent copy of the database (VACUUM INTO)
@@ -78,7 +78,7 @@ func serve() error {
 		return err
 	}
 	setupLogging(cfg.LogLevel)
-	slog.Info("starting mynotes", "version", version, "listen", cfg.Listen, "db", cfg.DBPath, "timezone", cfg.Timezone)
+	slog.Info("starting spider notes", "version", version, "listen", cfg.Listen, "db", cfg.DBPath, "timezone", cfg.Timezone)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

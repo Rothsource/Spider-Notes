@@ -202,8 +202,68 @@ func (s *Server) memosPage(w http.ResponseWriter, r *http.Request) {
 	if q.Get("tag") == "" && q.Get("q") == "" && q.Get("date") == "" {
 		pinned, _ = s.svc.PinnedMemos(r.Context())
 	}
+	heat, stats := s.memoActivity(r)
 	s.render(w, r, "memos", page{"Title": "Memos", "Page": mp, "Tags": tags, "Pinned": pinned,
-		"Tag": q.Get("tag"), "Q": q.Get("q"), "Date": q.Get("date")})
+		"Tag": q.Get("tag"), "Q": q.Get("q"), "Date": q.Get("date"), "Heat": heat, "Stats": stats})
+}
+
+// heatCell is one day in the activity heatmap.
+type heatCell struct {
+	ISO    string
+	Count  int
+	Level  int // 0..4
+	Future bool
+	Today  bool
+}
+
+type memoStats struct {
+	Memos, Tags, Days int
+}
+
+const heatWeeks = 15
+
+// memoActivity builds a Memos-style heatmap (weeks as columns, Mon..Sun rows)
+// and overall counts.
+func (s *Server) memoActivity(r *http.Request) ([][]heatCell, memoStats) {
+	now := s.svc.Now()
+	today := s.svc.StartOfDay(now)
+	end := today.AddDate(0, 0, 7-((int(today.Weekday())+6)%7)) // next Monday
+	start := end.AddDate(0, 0, -7*heatWeeks)
+	all, err := s.svc.MemoCounts(r.Context(), time.Date(2000, 1, 1, 0, 0, 0, 0, s.loc), now.AddDate(1, 0, 0))
+	if err != nil {
+		return nil, memoStats{}
+	}
+	var st memoStats
+	for _, n := range all {
+		st.Memos += n
+		st.Days++
+	}
+	if tags, err := s.svc.TagCounts(r.Context(), "memo"); err == nil {
+		st.Tags = len(tags)
+	}
+	weeks := make([][]heatCell, 0, heatWeeks)
+	for w := start; w.Before(end); w = w.AddDate(0, 0, 7) {
+		col := make([]heatCell, 7)
+		for i := range col {
+			d := w.AddDate(0, 0, i)
+			iso := d.Format("2006-01-02")
+			n := all[iso]
+			lvl := 0
+			switch {
+			case n >= 8:
+				lvl = 4
+			case n >= 4:
+				lvl = 3
+			case n >= 2:
+				lvl = 2
+			case n == 1:
+				lvl = 1
+			}
+			col[i] = heatCell{ISO: iso, Count: n, Level: lvl, Future: d.After(today), Today: d.Equal(today)}
+		}
+		weeks = append(weeks, col)
+	}
+	return weeks, st
 }
 
 func (s *Server) memosMore(w http.ResponseWriter, r *http.Request) {
@@ -481,7 +541,7 @@ func joinRange(a, b string) string {
 
 func (s *Server) exportZip(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", `attachment; filename="mynotes-export-`+s.svc.Now().Format("2006-01-02")+`.zip"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="spider-notes-export-`+s.svc.Now().Format("2006-01-02")+`.zip"`)
 	if err := s.svc.ExportZip(r.Context(), w); err != nil {
 		s.fail(w, r, err)
 	}

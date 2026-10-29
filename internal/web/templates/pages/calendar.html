@@ -1,25 +1,27 @@
 {{define "content"}}
 <div class="page-head cal-head">
-  <div class="row gap">
-    <a class="btn" href="/calendar?view={{.View}}&date={{.Prev}}" aria-label="Previous">‹</a>
-    <a class="btn" href="/calendar?view={{.View}}&date={{.Today}}">Today</a>
-    <a class="btn" href="/calendar?view={{.View}}&date={{.Next}}" aria-label="Next">›</a>
-  </div>
   <h1>{{.Label}}</h1>
-  <div class="row gap seg">
-    <a class="btn {{if eq .View "month"}}active{{end}}" href="/calendar?view=month&date={{iso .Anchor}}">Month</a>
-    <a class="btn {{if eq .View "week"}}active{{end}}" href="/calendar?view=week&date={{iso .Anchor}}">Week</a>
+  <div class="row gap wrap">
+    <div class="btn-group">
+      <a class="btn icon-only" href="/calendar?view={{.View}}&date={{.Prev}}" aria-label="Previous">{{icon "left"}}</a>
+      <a class="btn" href="/calendar?view={{.View}}&date={{.Today}}">Today</a>
+      <a class="btn icon-only" href="/calendar?view={{.View}}&date={{.Next}}" aria-label="Next">{{icon "right"}}</a>
+    </div>
+    <div class="tabs compact">
+      <a class="tab {{if eq .View "month"}}active{{end}}" href="/calendar?view=month&date={{iso .Anchor}}">Month</a>
+      <a class="tab {{if eq .View "week"}}active{{end}}" href="/calendar?view=week&date={{iso .Anchor}}">Week</a>
+    </div>
   </div>
 </div>
-<div class="legend small muted">
-  <span class="cal-item kind-task st-pending">task</span>
-  <span class="cal-item kind-reminder st-upcoming">reminder</span>
-  <span class="cal-item kind-task st-overdue">overdue</span>
-  <span class="cal-item kind-reminder st-done">done</span>
-  <span class="cal-item kind-reminder st-skipped">skipped</span>
-  <span class="cal-item kind-reminder st-missed">missed</span>
-  <span class="cal-item kind-reminder st-paused">paused</span>
-  <span>● memos</span>
+
+<div class="legend">
+  <span><i class="dot task"></i>Task</span>
+  <span><i class="dot reminder"></i>Reminder</span>
+  <span><i class="dot overdue"></i>Overdue</span>
+  <span><i class="dot done"></i>Done</span>
+  <span><i class="dot missed"></i>Missed / skipped</span>
+  <span><i class="dot paused"></i>Paused</span>
+  <span><i class="dot memo"></i>Has memos</span>
 </div>
 
 <div class="cal-layout">
@@ -30,9 +32,9 @@
     <div class="cal-week">
       {{range .}}
       <div class="cal-day {{if not .InMonth}}out{{end}} {{if .Today}}today{{end}}" hx-get="/calendar/day?date={{.ISO}}" hx-target="#day-panel" hx-swap="innerHTML" tabindex="0" role="button" aria-label="{{day .Date}}">
-        <div class="cal-date">{{.Date.Day}}{{if .Memos}} <span class="memo-dot" title="{{.Memos}} memo(s)">●</span>{{end}}</div>
+        <div class="cal-date"><span>{{.Date.Day}}</span>{{if .Memos}}<i class="dot memo" title="{{.Memos}} memo(s)"></i>{{end}}</div>
         {{range .Items}}{{template "calitem" .}}{{end}}
-        {{if .More}}<div class="muted small">+{{.More}} more</div>{{end}}
+        {{if .More}}<div class="cal-more">+{{.More}} more</div>{{end}}
       </div>
       {{end}}
     </div>
@@ -42,7 +44,7 @@
   <div class="cal-weekview">
     <div class="wv-row wv-headrow">
       <div class="wv-hour"></div>
-      {{range .Days}}<div class="wv-dayhead {{if .Today}}today{{end}}" hx-get="/calendar/day?date={{.ISO}}" hx-target="#day-panel" hx-swap="innerHTML" role="button" tabindex="0">{{.Date.Format "Mon 02"}}{{if .Memos}} <span class="memo-dot">●</span>{{end}}</div>{{end}}
+      {{range .Days}}<div class="wv-dayhead {{if .Today}}today{{end}}" hx-get="/calendar/day?date={{.ISO}}" hx-target="#day-panel" hx-swap="innerHTML" role="button" tabindex="0"><span class="wv-dow">{{.Date.Format "Mon"}}</span><span class="wv-num">{{.Date.Day}}</span>{{if .Memos}}<i class="dot memo"></i>{{end}}</div>{{end}}
     </div>
     <div class="wv-body" id="wv-body">
       {{range .Rows}}
@@ -54,6 +56,8 @@
     </div>
   </div>
 {{end}}
-  <aside class="day-panel card" id="day-panel" aria-live="polite"><p class="muted">Click a day to see everything on it and add tasks or reminders.</p></aside>
+  <aside class="day-panel card" id="day-panel" aria-live="polite">
+    <div class="empty small">{{icon "calendar"}}<p>Select a day to see everything on it and add tasks or reminders.</p></div>
+  </aside>
 </div>
 {{end}}

@@ -2,32 +2,34 @@
 
 {{define "occ"}}{{with .Data}}
 <div class="card occ status-{{.Status}}" id="occ-{{.ID}}">
+  <div class="occ-icon kind-{{.Kind}}">{{if eq .Kind "task"}}{{icon "tasks"}}{{else}}{{icon "bell"}}{{end}}</div>
   <div class="occ-main">
-    <div class="occ-title">{{if eq .Kind "task"}}📋{{else}}🔔{{end}} {{.Title}}</div>
-    <div class="muted small">
-      {{short .ScheduledFor}}
-      {{if gt .SentCount 1}} · sent {{.SentCount}}×{{end}}
-      {{if eq .Status "snoozed"}} · ⏰ until {{short .SnoozedUntil}}{{end}}
-      {{if eq .Status "done"}} · ✅ done {{short .DoneAt}}{{if .ActionSource}} via {{.ActionSource}}{{end}}{{end}}
-      {{if eq .Status "skipped"}} · ⏭ skipped{{end}}
-      {{if eq .Status "missed"}} · ⚠️ missed{{end}}
+    <div class="occ-title">{{.Title}}</div>
+    <div class="meta">
+      <span>{{icon "clock"}}{{short .ScheduledFor}}</span>
+      {{if .Repeating}}<span>{{icon "repeat"}}repeating</span>{{end}}
+      {{if gt .SentCount 1}}<span>sent {{.SentCount}}×</span>{{end}}
+      {{if eq .Status "snoozed"}}<span class="pill warn">{{icon "snooze"}}until {{hm .SnoozedUntil}}</span>{{end}}
+      {{if eq .Status "done"}}<span class="pill ok">{{icon "check"}}done {{ago .DoneAt}}{{if and .ActionSource (ne .ActionSource "system")}} · {{.ActionSource}}{{end}}</span>{{end}}
+      {{if eq .Status "skipped"}}<span class="pill">{{icon "skip"}}skipped</span>{{end}}
+      {{if eq .Status "missed"}}<span class="pill warn">{{icon "alert"}}missed</span>{{end}}
     </div>
   </div>
   {{if or (eq .Status "pending") (eq .Status "sent") (eq .Status "snoozed")}}
   <div class="occ-actions">
-    <button class="btn ok" hx-post="/occurrences/{{.ID}}/done" hx-target="#occ-{{.ID}}" hx-swap="outerHTML">✅ Done</button>
+    <button class="btn ok" hx-post="/occurrences/{{.ID}}/done" hx-target="#occ-{{.ID}}" hx-swap="outerHTML">{{icon "check"}}Done</button>
     {{if eq .Kind "reminder"}}
     <div class="dropdown">
-      <button class="btn" type="button" data-toggle-menu>⏰ Snooze</button>
+      <button class="btn" type="button" data-toggle-menu aria-haspopup="true">{{icon "snooze"}}Snooze</button>
       <div class="menu" hidden>
-        <button class="btn" hx-post="/occurrences/{{.ID}}/snooze10" hx-target="#occ-{{.ID}}" hx-swap="outerHTML">10 min</button>
-        <button class="btn" hx-post="/occurrences/{{.ID}}/snooze30" hx-target="#occ-{{.ID}}" hx-swap="outerHTML">30 min</button>
-        <button class="btn" hx-post="/occurrences/{{.ID}}/snooze60" hx-target="#occ-{{.ID}}" hx-swap="outerHTML">1 hour</button>
-        <button class="btn" hx-post="/occurrences/{{.ID}}/snooze_morning" hx-target="#occ-{{.ID}}" hx-swap="outerHTML">Tomorrow morning</button>
+        <button class="menu-item" hx-post="/occurrences/{{.ID}}/snooze10" hx-target="#occ-{{.ID}}" hx-swap="outerHTML">10 minutes</button>
+        <button class="menu-item" hx-post="/occurrences/{{.ID}}/snooze30" hx-target="#occ-{{.ID}}" hx-swap="outerHTML">30 minutes</button>
+        <button class="menu-item" hx-post="/occurrences/{{.ID}}/snooze60" hx-target="#occ-{{.ID}}" hx-swap="outerHTML">1 hour</button>
+        <button class="menu-item" hx-post="/occurrences/{{.ID}}/snooze_morning" hx-target="#occ-{{.ID}}" hx-swap="outerHTML">Tomorrow morning</button>
       </div>
     </div>
     {{end}}
-    {{if .Repeating}}<button class="btn" hx-post="/occurrences/{{.ID}}/skip" hx-target="#occ-{{.ID}}" hx-swap="outerHTML">⏭ Skip</button>{{end}}
+    {{if .Repeating}}<button class="btn ghost" title="Skip this one" hx-post="/occurrences/{{.ID}}/skip" hx-target="#occ-{{.ID}}" hx-swap="outerHTML">{{icon "skip"}}Skip</button>{{end}}
   </div>
   {{end}}
 </div>
@@ -36,37 +38,43 @@
 {{define "taskrow"}}{{with .Data}}
 <li class="task-row prio-{{.Priority}} {{if eq .Status "done"}}is-done{{end}} {{if and .DueAt (eq .Status "pending") (past .DueAt)}}is-overdue{{end}}" id="task-{{.ID}}">
   {{if eq .Status "done"}}
-  <button class="check checked" title="Mark not done" hx-post="/tasks/{{.ID}}/uncomplete" hx-target="#task-{{.ID}}" hx-swap="outerHTML" aria-label="Mark not done">✓</button>
+  <button class="check checked" title="Mark not done" hx-post="/tasks/{{.ID}}/uncomplete" hx-target="#task-{{.ID}}" hx-swap="outerHTML" aria-label="Mark not done">{{icon "check"}}</button>
   {{else}}
-  <button class="check" title="{{if .RepeatRule}}Complete this occurrence{{else}}Mark done{{end}}" hx-post="/tasks/{{.ID}}/complete" hx-target="#task-{{.ID}}" hx-swap="outerHTML" aria-label="Mark done"></button>
+  <button class="check" title="{{if .RepeatRule}}Complete this occurrence{{else}}Mark done{{end}}" hx-post="/tasks/{{.ID}}/complete" hx-target="#task-{{.ID}}" hx-swap="outerHTML" aria-label="Mark done">{{icon "check"}}</button>
   {{end}}
-  <div class="task-body">
-    <a class="task-title" href="/tasks/{{.ID}}">{{.Title}}</a>
-    <div class="muted small">
-      {{if .DueAt}}<span class="due">📅 {{short .DueAt}}</span>{{end}}
-      {{if .RepeatRule}}<span title="{{rule .RepeatRule ""}}">🔁 {{rule .RepeatRule ""}}</span>{{end}}
-      {{if eq .Priority "high"}}<span class="badge high">high</span>{{else if eq .Priority "low"}}<span class="badge low">low</span>{{end}}
-      {{range .Tags}}<a class="tag" href="/tasks?tag={{.}}&status=all">#{{.}}</a>{{end}}
-    </div>
-  </div>
+  <a class="task-body" href="/tasks/{{.ID}}">
+    <span class="task-title">{{.Title}}</span>
+    <span class="meta">
+      {{if .DueAt}}<span class="due">{{icon "calendar"}}{{short .DueAt}}</span>{{end}}
+      {{if .RepeatRule}}<span title="{{rule .RepeatRule ""}}">{{icon "repeat"}}{{rule .RepeatRule ""}}</span>{{end}}
+      {{if eq .Priority "high"}}<span class="pill danger">{{icon "flag"}}high</span>{{else if eq .Priority "low"}}<span class="pill">low</span>{{end}}
+      {{range .Tags}}<span class="tag">#{{.}}</span>{{end}}
+    </span>
+  </a>
   {{if and .RepeatRule (eq .Status "pending")}}
-  <button class="btn small" title="Skip this occurrence" hx-post="/tasks/{{.ID}}/skip" hx-target="#task-{{.ID}}" hx-swap="outerHTML">⏭</button>
+  <button class="icon-btn" title="Skip this occurrence" aria-label="Skip this occurrence" hx-post="/tasks/{{.ID}}/skip" hx-target="#task-{{.ID}}" hx-swap="outerHTML">{{icon "skip"}}</button>
   {{end}}
 </li>
 {{end}}{{end}}
 
 {{define "memo"}}{{with .Data}}
-<article class="card memo {{if .Pinned}}pinned{{end}}" id="memo-{{.ID}}" data-memo="{{.ID}}">
+<article class="memo {{if .Pinned}}pinned{{end}}" id="memo-{{.ID}}" data-memo="{{.ID}}">
   <header class="memo-head">
-    <time class="muted small" datetime="{{.CreatedAt.Format "2006-01-02T15:04:05Z07:00"}}">{{hm .CreatedAt}}{{if ne .CreatedAt.Unix .UpdatedAt.Unix}} · edited {{short .UpdatedAt}}{{end}}</time>
-    <div class="memo-tools">
-      {{if .Pinned}}
-      <button class="icon-btn" title="Unpin" hx-post="/memos/{{.ID}}/unpin" hx-target="#memo-{{.ID}}" hx-swap="outerHTML">📌</button>
-      {{else}}
-      <button class="icon-btn faint" title="Pin" hx-post="/memos/{{.ID}}/pin" hx-target="#memo-{{.ID}}" hx-swap="outerHTML">📌</button>
-      {{end}}
-      <button class="icon-btn" title="Edit" hx-get="/memos/{{.ID}}/edit" hx-target="#memo-{{.ID}}" hx-swap="outerHTML">✎</button>
-      <button class="icon-btn" title="Delete" hx-post="/memos/{{.ID}}/delete" hx-target="#memo-{{.ID}}" hx-swap="outerHTML" hx-confirm="Delete this memo?">🗑</button>
+    <time class="memo-time" datetime="{{.CreatedAt.Format "2006-01-02T15:04:05Z07:00"}}" title="{{dt .CreatedAt}}">{{ago .CreatedAt}}</time>
+    {{if ne .CreatedAt.Unix .UpdatedAt.Unix}}<span class="memo-edited" title="Edited {{dt .UpdatedAt}}">edited</span>{{end}}
+    <span class="grow"></span>
+    {{if .Pinned}}<span class="memo-pin" title="Pinned">{{icon "pin"}}</span>{{end}}
+    <div class="dropdown">
+      <button class="icon-btn" type="button" data-toggle-menu aria-label="Memo actions">{{icon "more"}}</button>
+      <div class="menu" hidden>
+        {{if .Pinned}}
+        <button class="menu-item" hx-post="/memos/{{.ID}}/unpin" hx-target="#memo-{{.ID}}" hx-swap="outerHTML">{{icon "pin"}}Unpin</button>
+        {{else}}
+        <button class="menu-item" hx-post="/memos/{{.ID}}/pin" hx-target="#memo-{{.ID}}" hx-swap="outerHTML">{{icon "pin"}}Pin</button>
+        {{end}}
+        <button class="menu-item" hx-get="/memos/{{.ID}}/edit" hx-target="#memo-{{.ID}}" hx-swap="outerHTML">{{icon "edit"}}Edit</button>
+        <button class="menu-item danger" hx-post="/memos/{{.ID}}/delete" hx-target="#memo-{{.ID}}" hx-swap="outerHTML" hx-confirm="Delete this memo?">{{icon "trash"}}Delete</button>
+      </div>
     </div>
   </header>
   <div class="md memo-body">{{mdi .ContentMD}}</div>
@@ -74,47 +82,57 @@
 </article>
 {{end}}{{end}}
 
+{{define "editor-tools"}}
+<div class="editor-tools">
+  <button type="button" class="icon-btn" data-insert="#" title="Add a tag" aria-label="Add a tag">{{icon "hash"}}</button>
+  <button type="button" class="icon-btn" data-insert="- [ ] " data-line title="Add a checkbox" aria-label="Add a checkbox">{{icon "checklist"}}</button>
+  <button type="button" class="icon-btn" data-insert="`" data-wrap title="Code" aria-label="Code">{{icon "code"}}</button>
+</div>
+{{end}}
+
 {{define "memoedit"}}{{with .Data}}
-<form class="card memo editing" id="memo-{{.ID}}" hx-post="/memos/{{.ID}}" hx-target="this" hx-swap="outerHTML">
-  <textarea name="content" rows="6" maxlength="20000" class="memo-input" required>{{.ContentMD}}</textarea>
-  <div class="row gap">
+<form class="memo editor editing" id="memo-{{.ID}}" hx-post="/memos/{{.ID}}" hx-target="this" hx-swap="outerHTML">
+  <textarea name="content" rows="5" maxlength="20000" class="editor-input" data-autosize data-ctrl-enter required>{{.ContentMD}}</textarea>
+  <div class="editor-bar">
+    {{template "editor-tools"}}
+    <span class="grow"></span>
+    <button class="btn ghost" type="button" hx-get="/memos/{{.ID}}" hx-target="#memo-{{.ID}}" hx-swap="outerHTML">Cancel</button>
     <button class="btn primary">Save</button>
-    <button class="btn" type="button" hx-get="/memos/{{.ID}}" hx-target="#memo-{{.ID}}" hx-swap="outerHTML">Cancel</button>
   </div>
 </form>
 {{end}}{{end}}
 
 {{define "memopage"}}{{$csrf := .CSRF}}{{with .Data}}
 {{range .Groups}}
-  {{if .ISO}}<h3 class="day-head">{{day .Day}}</h3>{{end}}
+  {{if .ISO}}<div class="day-divider"><span>{{day .Day}}</span></div>{{end}}
   {{range .Memos}}{{template "memo" (dict "Data" . "CSRF" $csrf)}}{{end}}
 {{end}}
-{{if .MoreURL}}<div class="more" hx-get="{{.MoreURL}}" hx-trigger="revealed" hx-swap="outerHTML"><span class="muted">Loading…</span></div>{{end}}
+{{if .MoreURL}}<div class="more" hx-get="{{.MoreURL}}" hx-trigger="revealed" hx-swap="outerHTML"><span class="spinner"></span></div>{{end}}
 {{end}}{{end}}
 
 {{define "calitem"}}
-<a class="cal-item kind-{{.Kind}} st-{{.Status}}" href="{{if eq .Kind "task"}}/tasks/{{.ID}}{{else}}/reminders/{{.ID}}{{end}}" title="{{.Title}} · {{.Status}}">
-  <span class="cal-time">{{hm .At}}</span> {{if .Repeating}}🔁{{end}}{{.Title}}{{if gt .Count 1}} ×{{.Count}}{{end}}
+<a class="cal-item kind-{{.Kind}} st-{{.Status}}" href="{{if eq .Kind "task"}}/tasks/{{.ID}}{{else}}/reminders/{{.ID}}{{end}}" title="{{hm .At}} {{.Title}} · {{.Status}}">
+  <span class="cal-time">{{hm .At}}</span>{{.Title}}{{if gt .Count 1}} ×{{.Count}}{{end}}
 </a>
 {{end}}
 
 {{define "daypanel"}}{{$csrf := .CSRF}}{{with .Data}}
 <div class="panel-head">
   <h3>{{day .Day}}</h3>
-  <button class="icon-btn" type="button" data-close-panel aria-label="Close">✕</button>
+  <button class="icon-btn" type="button" data-close-panel aria-label="Close">{{icon "x"}}</button>
 </div>
 <div class="row gap wrap">
-  <a class="btn small primary" href="/tasks/new?date={{iso .Day}}">+ Task</a>
-  <a class="btn small primary" href="/reminders/new?date={{iso .Day}}">+ Reminder</a>
-  <a class="btn small" href="/memos?date={{iso .Day}}">Memos</a>
+  <a class="btn small primary" href="/tasks/new?date={{iso .Day}}">{{icon "plus"}}Task</a>
+  <a class="btn small primary" href="/reminders/new?date={{iso .Day}}">{{icon "plus"}}Reminder</a>
+  <a class="btn small" href="/memos?date={{iso .Day}}">{{icon "memo"}}Memos</a>
 </div>
 {{if .Items}}
 <ul class="day-list">
   {{range .Items}}<li>{{template "calitem" .}}</li>{{end}}
 </ul>
-{{else}}<p class="muted">Nothing scheduled.</p>{{end}}
+{{else}}<p class="empty-note">Nothing scheduled.</p>{{end}}
 {{if .Memos}}
-<h4>Memos</h4>
-{{range .Memos}}<div class="card memo compact"><div class="muted small">{{hm .CreatedAt}}</div><div class="md">{{md .ContentMD}}</div></div>{{end}}
+<h4 class="section-label">Memos</h4>
+{{range .Memos}}<div class="memo compact"><div class="memo-time">{{hm .CreatedAt}}</div><div class="md">{{md .ContentMD}}</div></div>{{end}}
 {{end}}
 {{end}}{{end}}

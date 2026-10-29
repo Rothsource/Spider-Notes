@@ -1,35 +1,52 @@
 {{define "content"}}
-<div class="page-head">
-  <h1>Tasks</h1>
-  <a class="btn primary" href="/tasks/new">+ New task</a>
+<div class="narrow">
+  <div class="page-head">
+    <h1>Tasks</h1>
+    <a class="btn primary" href="/tasks/new">{{icon "plus"}}New task</a>
+  </div>
+
+  <form class="composer" method="post" action="/tasks">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <span class="composer-icon">{{icon "plus"}}</span>
+    <input name="title" placeholder="Add a task…" required maxlength="300" aria-label="Task title">
+    <input name="due" type="datetime-local" aria-label="Due date" class="composer-date">
+    <button class="btn primary">Add</button>
+  </form>
+
+  <div class="tabs" role="tablist">
+    <a role="tab" class="tab {{if eq .F.Status "pending"}}active{{end}}" href="/tasks?status=pending">Pending</a>
+    <a role="tab" class="tab {{if eq .F.Status "done"}}active{{end}}" href="/tasks?status=done">Done</a>
+    <a role="tab" class="tab {{if eq .F.Status "all"}}active{{end}}" href="/tasks?status=all">All</a>
+  </div>
+
+  <form class="filter-bar" method="get" action="/tasks">
+    <input type="hidden" name="status" value="{{.F.Status}}">
+    <div class="chips">
+      {{$st := .F.Status}}
+      <a class="chip {{if eq .F.Range ""}}on{{end}}" href="/tasks?status={{$st}}">Any time</a>
+      <a class="chip {{if eq .F.Range "today"}}on{{end}}" href="/tasks?status={{$st}}&range=today">Today</a>
+      <a class="chip {{if eq .F.Range "week"}}on{{end}}" href="/tasks?status={{$st}}&range=week">This week</a>
+      <a class="chip {{if eq .F.Range "overdue"}}on{{end}}" href="/tasks?status={{$st}}&range=overdue">Overdue</a>
+      <a class="chip {{if eq .F.Range "nodate"}}on{{end}}" href="/tasks?status={{$st}}&range=nodate">No date</a>
+    </div>
+    <div class="row gap wrap">
+      <input type="hidden" name="range" value="{{.F.Range}}">
+      <select name="priority" aria-label="Priority" data-autosubmit>
+        <option value="">Any priority</option>
+        <option value="high" {{if eq .F.Priority "high"}}selected{{end}}>High</option>
+        <option value="normal" {{if eq .F.Priority "normal"}}selected{{end}}>Normal</option>
+        <option value="low" {{if eq .F.Priority "low"}}selected{{end}}>Low</option>
+      </select>
+      <select name="tag" aria-label="Tag" data-autosubmit>
+        <option value="">Any tag</option>
+        {{range .Tags}}<option value="{{.Name}}" {{if eq $.F.Tag .Name}}selected{{end}}>#{{.Name}} ({{.Count}})</option>{{end}}
+      </select>
+      <input type="search" name="q" value="{{.F.Query}}" placeholder="Search tasks" aria-label="Search tasks" class="grow">
+    </div>
+  </form>
+
+  <ul class="task-list">
+    {{range .Tasks}}{{template "taskrow" (dict "Data" . "CSRF" $.CSRF)}}{{else}}<li class="empty">{{icon "tasks"}}<p>No tasks here.</p></li>{{end}}
+  </ul>
 </div>
-<form class="filters card" method="get" action="/tasks">
-  <select name="status" aria-label="Status">
-    <option value="pending" {{if eq .F.Status "pending"}}selected{{end}}>Pending</option>
-    <option value="done" {{if eq .F.Status "done"}}selected{{end}}>Done</option>
-    <option value="all" {{if eq .F.Status "all"}}selected{{end}}>All</option>
-  </select>
-  <select name="range" aria-label="When">
-    <option value="">Any date</option>
-    <option value="today" {{if eq .F.Range "today"}}selected{{end}}>Today</option>
-    <option value="week" {{if eq .F.Range "week"}}selected{{end}}>This week</option>
-    <option value="overdue" {{if eq .F.Range "overdue"}}selected{{end}}>Overdue</option>
-    <option value="nodate" {{if eq .F.Range "nodate"}}selected{{end}}>No date</option>
-  </select>
-  <select name="priority" aria-label="Priority">
-    <option value="">Any priority</option>
-    <option value="high" {{if eq .F.Priority "high"}}selected{{end}}>High</option>
-    <option value="normal" {{if eq .F.Priority "normal"}}selected{{end}}>Normal</option>
-    <option value="low" {{if eq .F.Priority "low"}}selected{{end}}>Low</option>
-  </select>
-  <select name="tag" aria-label="Tag">
-    <option value="">Any tag</option>
-    {{range .Tags}}<option value="{{.Name}}" {{if eq $.F.Tag .Name}}selected{{end}}>#{{.Name}} ({{.Count}})</option>{{end}}
-  </select>
-  <input type="search" name="q" value="{{.F.Query}}" placeholder="Search tasks" aria-label="Search tasks">
-  <button class="btn">Filter</button>
-</form>
-<ul class="task-list">
-  {{range .Tasks}}{{template "taskrow" (dict "Data" . "CSRF" $.CSRF)}}{{else}}<li class="muted empty">No tasks here.</li>{{end}}
-</ul>
 {{end}}

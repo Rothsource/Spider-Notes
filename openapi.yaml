@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Mynotes API
+  title: Spider Notes API
   version: "1.0"
   description: |
     Personal tasks, reminders, calendar and memos.

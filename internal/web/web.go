@@ -142,6 +142,18 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 	if _, ok := data["Msg"]; !ok {
 		data["Msg"] = r.URL.Query().Get("msg")
 	}
+	if data["CSRF"] != "" {
+		data["User"] = s.auth.Username(r.Context())
+		if open, err := s.svc.OpenOccurrences(r.Context()); err == nil {
+			n := 0
+			for _, o := range open {
+				if o.Kind == "reminder" {
+					n++
+				}
+			}
+			data["OpenCount"] = n
+		}
+	}
 	var buf bytes.Buffer
 	if err := t.ExecuteTemplate(&buf, "layout", data); err != nil {
 		slog.Error("render", "page", name, "err", err)
@@ -295,6 +307,47 @@ func (s *Server) funcs() template.FuncMap {
 		"firstline": model.FirstLine,
 		"weekdays":  func() []string { return []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"} },
 		"rem7":      func(i int) int { return i % 7 },
+		"icon": func(name string) template.HTML {
+			return template.HTML(`<svg class="i" aria-hidden="true"><use href="/static/icons.svg#` + template.HTMLEscapeString(name) + `"></use></svg>`) //nolint:gosec // name is escaped
+		},
+		// ago formats a time relative to now, Memos-style.
+		"ago": func(t any) string {
+			tt, ok := derefTime(t)
+			if !ok {
+				return ""
+			}
+			tt = tt.In(loc)
+			now := time.Now().In(loc)
+			d := now.Sub(tt)
+			switch {
+			case d < 0:
+				return tt.Format("Mon 02 Jan 15:04")
+			case d < time.Minute:
+				return "just now"
+			case d < time.Hour:
+				if m := int(d.Minutes()); m > 1 {
+					return strconv.Itoa(m) + " minutes ago"
+				}
+				return "1 minute ago"
+			case sameDay(tt, now):
+				if h := int(d.Hours()); h > 1 {
+					return strconv.Itoa(h) + " hours ago"
+				}
+				return "1 hour ago"
+			case sameDay(tt, now.AddDate(0, 0, -1)):
+				return "Yesterday " + tt.Format("15:04")
+			case tt.Year() == now.Year():
+				return tt.Format("02 Jan 15:04")
+			}
+			return tt.Format("02 Jan 2006 15:04")
+		},
+		"prefix": strings.HasPrefix,
+		"initial": func(s string) string {
+			for _, r := range s {
+				return strings.ToUpper(string(r))
+			}
+			return "?"
+		},
 		// slice2 returns part i of an "HH:MM-HH:MM" range.
 		"slice2": func(s string, i int) string {
 			parts := strings.SplitN(s, "-", 2)

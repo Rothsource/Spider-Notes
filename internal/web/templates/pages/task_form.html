@@ -1,85 +1,96 @@
 {{define "content"}}
 {{$t := .Task}}
-<div class="page-head">
-  <h1>{{if $t.ID}}Edit task{{else}}New task{{end}}</h1>
-  {{if $t.ID}}<span class="badge {{if eq $t.Status "done"}}ok{{end}}">{{$t.Status}}</span>{{end}}
-</div>
-<form class="card form" method="post" action="{{if $t.ID}}/tasks/{{$t.ID}}{{else}}/tasks{{end}}">
-  <input type="hidden" name="csrf_token" value="{{.CSRF}}">
-  <label>Title <input name="title" value="{{$t.Title}}" required maxlength="300" autofocus></label>
-  <label>Description <span class="muted small">(Markdown)</span>
-    <textarea name="description" rows="5" maxlength="20000">{{$t.DescriptionMD}}</textarea>
-  </label>
-  <div class="row gap wrap">
-    <label>Due <input type="datetime-local" name="due" value="{{dtlocal $t.DueAt}}"></label>
-    <label>Priority
-      <select name="priority">
-        <option value="low" {{if eq $t.Priority "low"}}selected{{end}}>Low</option>
-        <option value="normal" {{if or (eq $t.Priority "normal") (eq $t.Priority "")}}selected{{end}}>Normal</option>
-        <option value="high" {{if eq $t.Priority "high"}}selected{{end}}>High</option>
-      </select>
-    </label>
-    <label class="grow">Tags <input name="tags" value="{{join $t.Tags ", "}}" placeholder="home, work"></label>
+<div class="narrow">
+  <a class="back-link" href="/tasks">{{icon "left"}}Tasks</a>
+  <div class="page-head">
+    <h1>{{if $t.ID}}Edit task{{else}}New task{{end}}</h1>
+    {{if $t.ID}}<span class="pill {{if eq $t.Status "done"}}ok{{end}}">{{$t.Status}}</span>{{end}}
   </div>
-  {{$f := ""}}{{with .Repeat}}{{$f = .Freq}}{{end}}
-  <fieldset class="repeat" data-switch>
-    <legend>Repeat</legend>
-    <div class="row gap wrap">
-      <label>Frequency
-        <select name="repeat_freq" data-switch-source>
-          <option value="" {{if eq $f ""}}selected{{end}}>Does not repeat</option>
-          <option value="daily" {{if eq $f "daily"}}selected{{end}}>Daily / every N days</option>
-          <option value="weekly" {{if eq $f "weekly"}}selected{{end}}>Weekly</option>
-          <option value="monthly" {{if eq $f "monthly"}}selected{{end}}>Monthly</option>
+
+  <form class="card form" method="post" action="{{if $t.ID}}/tasks/{{$t.ID}}{{else}}/tasks{{end}}">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <input class="title-input" name="title" value="{{$t.Title}}" required maxlength="300" placeholder="What needs to be done?" aria-label="Title" autofocus>
+    <textarea name="description" rows="4" maxlength="20000" placeholder="Notes (Markdown)" aria-label="Description" data-autosize>{{$t.DescriptionMD}}</textarea>
+
+    <div class="field-grid">
+      <label>{{icon "calendar"}} Due<input type="datetime-local" name="due" value="{{dtlocal $t.DueAt}}"></label>
+      <label>{{icon "flag"}} Priority
+        <select name="priority">
+          <option value="low" {{if eq $t.Priority "low"}}selected{{end}}>Low</option>
+          <option value="normal" {{if or (eq $t.Priority "normal") (eq $t.Priority "")}}selected{{end}}>Normal</option>
+          <option value="high" {{if eq $t.Priority "high"}}selected{{end}}>High</option>
         </select>
       </label>
-      <label data-show="daily weekly monthly">Every
-        <input type="number" name="repeat_interval" min="1" max="1000" value="{{with .Repeat}}{{.Interval}}{{else}}1{{end}}" class="num">
-      </label>
-      <label data-show="monthly">Day of month
-        <input type="number" name="repeat_monthday" min="1" max="31" value="{{with .Repeat}}{{if .MonthDay}}{{.MonthDay}}{{end}}{{end}}" class="num" placeholder="due day">
-      </label>
-      <label data-show="daily weekly monthly">Until <input type="date" name="repeat_until" value="{{with .Repeat}}{{.Until}}{{end}}"></label>
+      <label class="span-2">{{icon "hash"}} Tags<input name="tags" value="{{join $t.Tags ", "}}" placeholder="home, work"></label>
     </div>
-    <div class="weekdays" data-show="weekly">
-      {{range $i, $n := weekdays}}
-      <label class="chip"><input type="checkbox" name="repeat_weekdays" value="{{$i}}" {{with $.Repeat}}{{if has .Weekdays $i}}checked{{end}}{{end}}> {{$n}}</label>
-      {{end}}
+
+    {{$f := ""}}{{with .Repeat}}{{$f = .Freq}}{{end}}
+    <div class="form-section" data-switch>
+      <div class="section-label">{{icon "repeat"}} Repeat</div>
+      <div class="segmented">
+        <label><input type="radio" name="repeat_freq" value="" data-switch-source {{if eq $f ""}}checked{{end}}><span>Never</span></label>
+        <label><input type="radio" name="repeat_freq" value="daily" data-switch-source {{if eq $f "daily"}}checked{{end}}><span>Daily</span></label>
+        <label><input type="radio" name="repeat_freq" value="weekly" data-switch-source {{if eq $f "weekly"}}checked{{end}}><span>Weekly</span></label>
+        <label><input type="radio" name="repeat_freq" value="monthly" data-switch-source {{if eq $f "monthly"}}checked{{end}}><span>Monthly</span></label>
+      </div>
+      <div class="weekday-picker" data-show="weekly">
+        {{range $i, $n := weekdays}}
+        <label><input type="checkbox" name="repeat_weekdays" value="{{$i}}" {{with $.Repeat}}{{if has .Weekdays $i}}checked{{end}}{{end}}><span>{{$n}}</span></label>
+        {{end}}
+      </div>
+      <div class="field-grid" data-show="daily weekly monthly">
+        <label>Every
+          <span class="inline-field"><input type="number" name="repeat_interval" min="1" max="1000" value="{{with .Repeat}}{{.Interval}}{{else}}1{{end}}" class="num">
+          <span class="muted" data-show="daily">day(s)</span><span class="muted" data-show="weekly">week(s)</span><span class="muted" data-show="monthly">month(s)</span></span>
+        </label>
+        <label data-show="monthly">Day of month<input type="number" name="repeat_monthday" min="1" max="31" value="{{with .Repeat}}{{if .MonthDay}}{{.MonthDay}}{{end}}{{end}}" class="num" placeholder="due day"></label>
+        <label>Until (optional)<input type="date" name="repeat_until" value="{{with .Repeat}}{{.Until}}{{end}}"></label>
+      </div>
+      <p class="hint" data-show="daily weekly monthly">The time comes from the due date. Completing moves the task to its next occurrence. Days 29–31 fall back to the last day of shorter months.</p>
     </div>
-    <p class="muted small" data-show="daily weekly monthly">The time of day comes from the due date. Completing a repeating task moves it to the next occurrence. Day 29–31 falls back to the last day in shorter months.</p>
-  </fieldset>
-  <div class="row gap wrap">
-    <button class="btn primary">Save</button>
-    <button class="btn" name="add_reminder" value="1">Save &amp; add reminder</button>
-    <a class="btn" href="/tasks">Cancel</a>
+
+    <div class="form-actions">
+      <a class="btn ghost" href="/tasks">Cancel</a>
+      <span class="grow"></span>
+      <button class="btn" name="add_reminder" value="1">{{icon "bell"}}Save &amp; add reminder</button>
+      <button class="btn primary">Save</button>
+    </div>
+  </form>
+
+  {{if $t.ID}}
+  <div class="action-strip">
+    {{if eq $t.Status "pending"}}
+    <form method="post" action="/tasks/{{$t.ID}}/complete"><input type="hidden" name="csrf_token" value="{{.CSRF}}"><input type="hidden" name="back" value="/tasks/{{$t.ID}}"><button class="btn ok">{{icon "check"}}{{if $t.RepeatRule}}Complete occurrence{{else}}Mark done{{end}}</button></form>
+    {{if $t.RepeatRule}}<form method="post" action="/tasks/{{$t.ID}}/skip"><input type="hidden" name="csrf_token" value="{{.CSRF}}"><input type="hidden" name="back" value="/tasks/{{$t.ID}}"><button class="btn">{{icon "skip"}}Skip occurrence</button></form>{{end}}
+    {{else}}
+    <form method="post" action="/tasks/{{$t.ID}}/uncomplete"><input type="hidden" name="csrf_token" value="{{.CSRF}}"><input type="hidden" name="back" value="/tasks/{{$t.ID}}"><button class="btn">{{icon "left"}}Mark not done</button></form>
+    {{end}}
+    <span class="grow"></span>
+    <form method="post" action="/tasks/{{$t.ID}}/delete" data-confirm="Delete this task? Its history is kept."><input type="hidden" name="csrf_token" value="{{.CSRF}}"><button class="btn danger">{{icon "trash"}}Delete</button></form>
   </div>
-</form>
 
-{{if $t.ID}}
-<div class="row gap wrap actions-row">
-  {{if eq $t.Status "pending"}}
-  <form method="post" action="/tasks/{{$t.ID}}/complete"><input type="hidden" name="csrf_token" value="{{.CSRF}}"><input type="hidden" name="back" value="/tasks/{{$t.ID}}"><button class="btn ok">✅ {{if $t.RepeatRule}}Complete occurrence{{else}}Mark done{{end}}</button></form>
-  {{if $t.RepeatRule}}<form method="post" action="/tasks/{{$t.ID}}/skip"><input type="hidden" name="csrf_token" value="{{.CSRF}}"><input type="hidden" name="back" value="/tasks/{{$t.ID}}"><button class="btn">⏭ Skip occurrence</button></form>{{end}}
-  {{else}}
-  <form method="post" action="/tasks/{{$t.ID}}/uncomplete"><input type="hidden" name="csrf_token" value="{{.CSRF}}"><input type="hidden" name="back" value="/tasks/{{$t.ID}}"><button class="btn">↩ Mark not done</button></form>
+  <section class="section">
+    <div class="section-head">
+      <div class="section-label">Reminders</div>
+      <a class="btn small" href="/reminders/new?task_id={{$t.ID}}">{{icon "plus"}}Add</a>
+    </div>
+    {{range .Reminders}}
+    <a class="list-row" href="/reminders/{{.ID}}">
+      <span class="list-icon">{{icon "bell"}}</span>
+      <span class="grow">
+        <span class="list-title">{{with .MessageMD}}{{firstline .}}{{else}}Reminder for this task{{end}}</span>
+        <span class="meta">{{if .NextFireAt}}<span>{{icon "clock"}}{{short .NextFireAt}}</span>{{else}}<span>finished</span>{{end}}{{if .RepeatRule}}<span>{{icon "repeat"}}{{rule .RepeatRule .ActiveWindow}}</span>{{end}}{{if not .Enabled}}<span class="pill">paused</span>{{end}}</span>
+      </span>
+    </a>
+    {{else}}<p class="empty-note">No reminders yet.</p>{{end}}
+  </section>
+
+  {{if .History}}
+  <section class="section">
+    <div class="section-label">History</div>
+    {{range .History}}{{template "occ" (dict "Data" . "CSRF" $.CSRF)}}{{end}}
+  </section>
   {{end}}
-  <form method="post" action="/tasks/{{$t.ID}}/delete" data-confirm="Delete this task? Its history is kept."><input type="hidden" name="csrf_token" value="{{.CSRF}}"><button class="btn danger">Delete</button></form>
+  {{end}}
 </div>
-
-{{if $t.DescriptionMD}}<section class="card md">{{md $t.DescriptionMD}}</section>{{end}}
-
-<section>
-  <div class="page-head"><h2>Reminders for this task</h2><a class="btn small primary" href="/reminders/new?task_id={{$t.ID}}">+ Add reminder</a></div>
-  <ul class="plain-list">
-    {{range .Reminders}}<li><a href="/reminders/{{.ID}}">{{if .NextFireAt}}{{short .NextFireAt}}{{else}}finished{{end}} · {{with .MessageMD}}{{firstline .}}{{else}}(task title){{end}}</a>{{if not .Enabled}} <span class="badge">paused</span>{{end}}{{if .RepeatRule}} <span class="muted small">🔁 {{rule .RepeatRule .ActiveWindow}}</span>{{end}}</li>
-    {{else}}<li class="muted">No reminders.</li>{{end}}
-  </ul>
-</section>
-{{if .History}}
-<section>
-  <h2>History</h2>
-  {{range .History}}{{template "occ" (dict "Data" . "CSRF" $.CSRF)}}{{end}}
-</section>
-{{end}}
-{{end}}
 {{end}}

@@ -403,7 +403,7 @@ func (b *Bot) SendTest(ctx context.Context) error {
 	if c == nil {
 		return errors.New("telegram is still connecting or the token is invalid, check the logs")
 	}
-	_, err := c.Send(tgbotapi.NewMessage(chatID, "✅ Test message from Mynotes. Reminders will arrive here at "+time.Now().In(b.svc.Location()).Format("15:04 MST")+"."))
+	_, err := c.Send(tgbotapi.NewMessage(chatID, "✅ Test message from Spider Notes 🕷️. Reminders will arrive here at "+time.Now().In(b.svc.Location()).Format("15:04 MST")+"."))
 	if err != nil {
 		return errors.New(b.redact(err))
 	}

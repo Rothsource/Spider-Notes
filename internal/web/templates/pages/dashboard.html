@@ -1,44 +1,67 @@
 {{define "content"}}
-<div class="page-head">
-  <h1>{{day .Now}}</h1>
-  {{if .Quiet}}<span class="badge">🌙 Quiet hours</span>{{end}}
-</div>
+<div class="with-rail">
+  <div class="feed">
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">{{.Now.Format "Monday"}}</div>
+        <h1>{{.Now.Format "02 January 2006"}}</h1>
+      </div>
+      {{if .Quiet}}<span class="pill">{{icon "moon"}}Quiet hours</span>{{end}}
+    </div>
 
-<form class="quick-add card" method="post" action="/tasks">
-  <input type="hidden" name="csrf_token" value="{{.CSRF}}">
-  <input type="hidden" name="back" value="/">
-  <input name="title" placeholder="Quick add a task…" required maxlength="300" aria-label="Task title">
-  <input name="due" type="datetime-local" aria-label="Due">
-  <button class="btn primary">Add</button>
-</form>
+    <form class="composer" method="post" action="/tasks">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <input type="hidden" name="back" value="/">
+      <span class="composer-icon">{{icon "plus"}}</span>
+      <input name="title" placeholder="Add a task…" required maxlength="300" aria-label="Task title">
+      <input name="due" type="datetime-local" aria-label="Due date" class="composer-date">
+      <button class="btn primary">Add</button>
+    </form>
 
-<div class="grid-2">
-  <section>
-    <h2>Needs attention</h2>
-    {{range .Open}}{{template "occ" (dict "Data" . "CSRF" $.CSRF)}}{{else}}<p class="muted">No open reminders. 🎉</p>{{end}}
+    <section class="section">
+      <div class="section-label">Needs attention{{with .Open}} <span class="count">{{len .}}</span>{{end}}</div>
+      {{range .Open}}{{template "occ" (dict "Data" . "CSRF" $.CSRF)}}{{else}}<div class="empty small">{{icon "check"}}<p>All caught up.</p></div>{{end}}
+    </section>
 
-    <h2>Overdue tasks</h2>
-    <ul class="task-list">
-      {{range .Overdue}}{{template "taskrow" (dict "Data" . "CSRF" $.CSRF)}}{{else}}<li class="muted empty">Nothing overdue.</li>{{end}}
-    </ul>
-
-    <h2>Later today</h2>
-    <ul class="task-list">
-      {{range .Today}}{{template "taskrow" (dict "Data" . "CSRF" $.CSRF)}}{{else}}<li class="muted empty">No more tasks due today.</li>{{end}}
-    </ul>
-  </section>
-  <section>
-    <h2>Upcoming reminders <span class="muted small">next 24h</span></h2>
-    <ul class="plain-list">
-      {{range .Upcoming}}
-      <li><a href="/reminders/{{.ID}}"><span class="muted">{{short .NextFireAt}}</span> · {{with .MessageMD}}{{firstline .}}{{end}}{{if .TaskTitle}} <span class="muted">(📋 {{.TaskTitle}})</span>{{end}}</a></li>
-      {{else}}<li class="muted">None.</li>{{end}}
-    </ul>
-    <p class="row gap"><a class="btn small" href="/reminders/new">+ New reminder</a> <a class="btn small" href="/memos">✎ Write a memo</a></p>
-    {{if .Pinned}}
-    <h2>📌 Pinned memos</h2>
-    {{range .Pinned}}<div class="card memo compact"><div class="md">{{md .ContentMD}}</div></div>{{end}}
+    {{if .Overdue}}
+    <section class="section">
+      <div class="section-label danger">Overdue <span class="count">{{len .Overdue}}</span></div>
+      <ul class="task-list">{{range .Overdue}}{{template "taskrow" (dict "Data" . "CSRF" $.CSRF)}}{{end}}</ul>
+    </section>
     {{end}}
-  </section>
+
+    <section class="section">
+      <div class="section-label">Later today</div>
+      <ul class="task-list">
+        {{range .Today}}{{template "taskrow" (dict "Data" . "CSRF" $.CSRF)}}{{else}}<li class="empty-note">No more tasks due today.</li>{{end}}
+      </ul>
+    </section>
+  </div>
+
+  <aside class="rail">
+    <div class="rail-section">
+      <div class="section-label">Next 24 hours</div>
+      {{if .Upcoming}}
+      <ul class="timeline">
+        {{range .Upcoming}}
+        <li><a href="/reminders/{{.ID}}">
+          <span class="tl-time">{{hm .NextFireAt}}</span>
+          <span class="tl-text">{{with .MessageMD}}{{firstline .}}{{else}}{{.TaskTitle}}{{end}}</span>
+        </a></li>
+        {{end}}
+      </ul>
+      {{else}}<p class="empty-note">No reminders coming up.</p>{{end}}
+      <div class="row gap wrap mt">
+        <a class="btn small" href="/reminders/new">{{icon "bell"}}New reminder</a>
+        <a class="btn small" href="/memos">{{icon "edit"}}Write a memo</a>
+      </div>
+    </div>
+    {{if .Pinned}}
+    <div class="rail-section">
+      <div class="section-label">Pinned</div>
+      {{range .Pinned}}<a class="memo compact link" href="/memos#memo-{{.ID}}"><div class="md">{{md .ContentMD}}</div></a>{{end}}
+    </div>
+    {{end}}
+  </aside>
 </div>
 {{end}}

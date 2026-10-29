@@ -1,23 +1,28 @@
 {{define "content"}}
-<div class="page-head"><h1>Search</h1></div>
-<form class="row gap" method="get" action="/search">
-  <input type="search" name="q" value="{{.Q}}" placeholder="Search memos, tasks and reminders" class="grow" autofocus aria-label="Search">
-  <button class="btn primary">Search</button>
-</form>
-{{if .Q}}
-  {{if .Hits}}
-  <ul class="search-results">
-    {{range .Hits}}
-    <li class="card">
-      <div>
-        <span class="badge">{{.Kind}}</span>
-        <a href="{{if eq .Kind "memo"}}/memos?date={{iso .When}}#memo-{{.ID}}{{else if eq .Kind "task"}}/tasks/{{.ID}}{{else}}/reminders/{{.ID}}{{end}}"><strong>{{.Title}}</strong></a>
-        <span class="muted small">{{short .When}}</span>
-      </div>
-      <div class="snippet">{{snippet .Snippet}}</div>
-    </li>
-    {{end}}
-  </ul>
-  {{else}}<p class="muted">No results for “{{.Q}}”.</p>{{end}}
-{{end}}
+<div class="narrow">
+  <div class="page-head"><h1>Search</h1></div>
+  <form class="search-box" method="get" action="/search">
+    {{icon "search"}}
+    <input type="search" name="q" value="{{.Q}}" placeholder="Search memos, tasks and reminders" autofocus aria-label="Search">
+  </form>
+  {{if .Q}}
+    {{if .Hits}}
+    <p class="muted small">{{len .Hits}} result(s)</p>
+    <div class="card list-card">
+      {{range .Hits}}
+      <a class="list-row" href="{{if eq .Kind "memo"}}/memos?date={{iso .When}}#memo-{{.ID}}{{else if eq .Kind "task"}}/tasks/{{.ID}}{{else}}/reminders/{{.ID}}{{end}}">
+        <span class="list-icon">{{if eq .Kind "memo"}}{{icon "memo"}}{{else if eq .Kind "task"}}{{icon "tasks"}}{{else}}{{icon "bell"}}{{end}}</span>
+        <span class="grow">
+          <span class="list-title">{{.Title}}</span>
+          <span class="snippet">{{snippet .Snippet}}</span>
+          <span class="meta"><span>{{.Kind}}</span><span>{{ago .When}}</span></span>
+        </span>
+      </a>
+      {{end}}
+    </div>
+    {{else}}<div class="empty">{{icon "search"}}<p>No results for “{{.Q}}”.</p></div>{{end}}
+  {{else}}
+  <div class="empty">{{icon "search"}}<p>Every word is matched as a prefix, so “doc” finds “doctor”.</p></div>
+  {{end}}
+</div>
 {{end}}

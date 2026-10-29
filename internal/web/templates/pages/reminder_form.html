@@ -1,109 +1,119 @@
 {{define "content"}}
 {{$fd := .Form}}{{$r := $fd.R}}{{$rp := $fd.Repeat}}
-<div class="page-head">
-  <h1>{{if $r.ID}}Edit reminder{{else}}New reminder{{end}}</h1>
-  {{if $r.ID}}{{if $r.Enabled}}<span class="badge ok">active</span>{{else}}<span class="badge">paused</span>{{end}}{{end}}
-</div>
-<form class="card form" method="post" action="{{if $r.ID}}/reminders/{{$r.ID}}{{else}}/reminders{{end}}" data-switch>
-  <input type="hidden" name="csrf_token" value="{{.CSRF}}">
-  <label>Message <span class="muted small">(what Telegram will say; Markdown allowed)</span>
-    <textarea name="message" rows="3" maxlength="4000" placeholder="You should not eat this this morning" autofocus>{{$r.MessageMD}}</textarea>
-  </label>
-  <div class="row gap wrap">
-    <label class="grow">Attach to task <span class="muted small">(optional)</span>
-      <select name="task_id">
-        <option value="">— standalone —</option>
-        {{range .Tasks}}<option value="{{.ID}}" {{if eq (deref $r.TaskID) .ID}}selected{{end}}>{{.Title}}{{if .DueAt}} · {{short .DueAt}}{{end}}</option>{{end}}
-      </select>
+<div class="narrow">
+  <a class="back-link" href="/reminders">{{icon "left"}}Reminders</a>
+  <div class="page-head">
+    <h1>{{if $r.ID}}Edit reminder{{else}}New reminder{{end}}</h1>
+    {{if $r.ID}}{{if $r.Enabled}}<span class="pill ok">active</span>{{else}}<span class="pill">paused</span>{{end}}{{end}}
+  </div>
+
+  <form class="card form" method="post" action="{{if $r.ID}}/reminders/{{$r.ID}}{{else}}/reminders{{end}}" data-switch>
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <textarea class="title-input" name="message" rows="2" maxlength="4000" placeholder="What should Telegram tell you? e.g. You should not eat this this morning" aria-label="Message" data-autosize autofocus>{{$r.MessageMD}}</textarea>
+
+    <div class="field-grid">
+      <label>{{icon "link"}} Attach to task
+        <select name="task_id">
+          <option value="">Standalone</option>
+          {{range .Tasks}}<option value="{{.ID}}" {{if eq (deref $r.TaskID) .ID}}selected{{end}}>{{.Title}}{{if .DueAt}} · {{short .DueAt}}{{end}}</option>{{end}}
+        </select>
+      </label>
+      <label>{{icon "hash"}} Tags<input name="tags" value="{{join $r.Tags ", "}}" placeholder="health"></label>
+    </div>
+
+    <div class="form-section">
+      <div class="section-label">{{icon "clock"}} When</div>
+      <div class="segmented">
+        <label><input type="radio" name="type" value="one_time" data-switch-source {{if not $fd.IsRepeating}}checked{{end}}><span>One time</span></label>
+        <label><input type="radio" name="type" value="repeating" data-switch-source {{if $fd.IsRepeating}}checked{{end}}><span>Repeating</span></label>
+      </div>
+
+      <div data-show="one_time">
+        <label>Date &amp; time<input type="datetime-local" name="fire_at" value="{{$fd.FireAt}}"></label>
+      </div>
+
+      <div data-show="repeating" data-switch class="stack">
+        <div class="segmented wrap">
+          <label><input type="radio" name="freq" value="daily" data-switch-source {{if eq $rp.Freq "daily"}}checked{{end}}><span>Daily</span></label>
+          <label><input type="radio" name="freq" value="weekly" data-switch-source {{if eq $rp.Freq "weekly"}}checked{{end}}><span>Weekdays</span></label>
+          <label><input type="radio" name="freq" value="monthly" data-switch-source {{if eq $rp.Freq "monthly"}}checked{{end}}><span>Monthly</span></label>
+          <label><input type="radio" name="freq" value="hourly" data-switch-source {{if eq $rp.Freq "hourly"}}checked{{end}}><span>Hours</span></label>
+          <label><input type="radio" name="freq" value="minutely" data-switch-source {{if eq $rp.Freq "minutely"}}checked{{end}}><span>Minutes</span></label>
+        </div>
+        <div class="weekday-picker" data-show="weekly">
+          {{range $i, $n := weekdays}}
+          <label><input type="checkbox" name="weekdays" value="{{$i}}" {{if has $rp.Weekdays $i}}checked{{end}}><span>{{$n}}</span></label>
+          {{end}}
+        </div>
+        <div class="field-grid">
+          <label>Every
+            <span class="inline-field"><input type="number" class="num" name="interval" min="1" max="1000" value="{{if $rp.Interval}}{{$rp.Interval}}{{else}}1{{end}}">
+            <span class="muted" data-show="daily">day(s)</span><span class="muted" data-show="weekly">week(s)</span><span class="muted" data-show="monthly">month(s)</span><span class="muted" data-show="hourly">hour(s)</span><span class="muted" data-show="minutely">minutes (min 5)</span></span>
+          </label>
+          <label data-show="daily weekly monthly">At<input type="time" name="time" value="{{$rp.Time}}"></label>
+          <label data-show="monthly">Day of month<input type="number" class="num" name="month_day" min="1" max="31" value="{{if $rp.MonthDay}}{{$rp.MonthDay}}{{else}}1{{end}}"></label>
+          <label data-show="hourly minutely">First at<input type="time" name="sub_start" value="{{hm $r.FireAt}}"></label>
+          <label data-show="hourly minutely">Only from<input type="time" name="window_start" value="{{$fd.WinStart}}"></label>
+          <label data-show="hourly minutely">until<input type="time" name="window_end" value="{{$fd.WinEnd}}"></label>
+          <label>Starts on<input type="date" name="start_date" value="{{$fd.StartDate}}"></label>
+          <label>Ends on (optional)<input type="date" name="until" value="{{$rp.Until}}"></label>
+          <label>Max times (optional)<input type="number" class="num" name="count" min="0" value="{{if $rp.Count}}{{$rp.Count}}{{end}}" placeholder="∞"></label>
+        </div>
+        <p class="hint" data-show="monthly">Days 29–31 fire on the last day of shorter months.</p>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="section-label">{{icon "snooze"}} Nag mode</div>
+      <label class="switch-row">
+        <span><strong>Remind me until I respond</strong><span class="hint">Re-send until you press Done or Snooze.</span></span>
+        <input type="checkbox" name="nag" class="switch" {{if $r.NagEnabled}}checked{{end}}>
+      </label>
+      <label class="inline-label">Every <input type="number" class="num" name="nag_interval" min="1" max="1440" value="{{$r.NagIntervalMin}}"> minutes</label>
+    </div>
+
+    <div class="form-section" data-switch>
+      <div class="section-label">{{icon "moon"}} Quiet hours</div>
+      <div class="segmented">
+        <label><input type="radio" name="quiet_mode" value="global" data-switch-source {{if eq $fd.QuietMode "global"}}checked{{end}}><span>Use global</span></label>
+        <label><input type="radio" name="quiet_mode" value="off" data-switch-source {{if eq $fd.QuietMode "off"}}checked{{end}}><span>None</span></label>
+        <label><input type="radio" name="quiet_mode" value="custom" data-switch-source {{if eq $fd.QuietMode "custom"}}checked{{end}}><span>Custom</span></label>
+      </div>
+      <div class="field-grid" data-show="custom">
+        <label>From<input type="time" name="quiet_start" value="{{$fd.QuietStart}}"></label>
+        <label>To<input type="time" name="quiet_end" value="{{$fd.QuietEnd}}"></label>
+      </div>
+      <label class="switch-row">
+        <span><strong>Ignore quiet hours</strong><span class="hint">Send even at night.</span></span>
+        <input type="checkbox" name="ignore_quiet" class="switch" {{if $r.IgnoreQuietHours}}checked{{end}}>
+      </label>
+    </div>
+
+    <label class="switch-row">
+      <span><strong>Enabled</strong></span>
+      <input type="checkbox" name="enabled" class="switch" {{if $r.Enabled}}checked{{end}}>
     </label>
-    <label class="grow">Tags <input name="tags" value="{{join $r.Tags ", "}}" placeholder="health"></label>
+
+    <div class="form-actions">
+      <a class="btn ghost" href="/reminders">Cancel</a>
+      <span class="grow"></span>
+      <button class="btn primary">Save reminder</button>
+    </div>
+  </form>
+
+  {{if $r.ID}}
+  <div class="action-strip">
+    <form method="post" action="/reminders/{{$r.ID}}/{{if $r.Enabled}}pause{{else}}resume{{end}}"><input type="hidden" name="csrf_token" value="{{.CSRF}}"><input type="hidden" name="back" value="/reminders/{{$r.ID}}"><button class="btn">{{if $r.Enabled}}{{icon "pause"}}Pause{{else}}{{icon "play"}}Resume{{end}}</button></form>
+    {{if $r.NextFireAt}}<span class="muted">{{icon "clock"}} Next: {{dt $r.NextFireAt}}</span>{{end}}
+    <span class="grow"></span>
+    <form method="post" action="/reminders/{{$r.ID}}/delete" data-confirm="Delete this reminder? Its history is kept."><input type="hidden" name="csrf_token" value="{{.CSRF}}"><button class="btn danger">{{icon "trash"}}Delete</button></form>
   </div>
-
-  <fieldset>
-    <legend>When</legend>
-    <div class="row gap">
-      <label class="chip"><input type="radio" name="type" value="one_time" data-switch-source {{if not $fd.IsRepeating}}checked{{end}}> One time</label>
-      <label class="chip"><input type="radio" name="type" value="repeating" data-switch-source {{if $fd.IsRepeating}}checked{{end}}> Repeating</label>
-    </div>
-    <div data-show="one_time">
-      <label>Date &amp; time <input type="datetime-local" name="fire_at" value="{{$fd.FireAt}}"></label>
-    </div>
-    <div data-show="repeating" data-switch>
-      <div class="row gap wrap">
-        <label>Repeat
-          <select name="freq" data-switch-source>
-            <option value="daily" {{if eq $rp.Freq "daily"}}selected{{end}}>Daily / every N days</option>
-            <option value="weekly" {{if eq $rp.Freq "weekly"}}selected{{end}}>On weekdays</option>
-            <option value="monthly" {{if eq $rp.Freq "monthly"}}selected{{end}}>Monthly</option>
-            <option value="hourly" {{if eq $rp.Freq "hourly"}}selected{{end}}>Every N hours</option>
-            <option value="minutely" {{if eq $rp.Freq "minutely"}}selected{{end}}>Every N minutes</option>
-          </select>
-        </label>
-        <label>Every <input type="number" class="num" name="interval" min="1" max="1000" value="{{if $rp.Interval}}{{$rp.Interval}}{{else}}1{{end}}">
-          <span class="muted small" data-show="daily">day(s)</span><span class="muted small" data-show="weekly">week(s)</span><span class="muted small" data-show="monthly">month(s)</span><span class="muted small" data-show="hourly">hour(s)</span><span class="muted small" data-show="minutely">minutes (min 5)</span>
-        </label>
-        <label data-show="daily weekly monthly">At <input type="time" name="time" value="{{$rp.Time}}"></label>
-        <label data-show="monthly">Day of month <input type="number" class="num" name="month_day" min="1" max="31" value="{{if $rp.MonthDay}}{{$rp.MonthDay}}{{else}}1{{end}}"></label>
-        <label data-show="hourly minutely">First at <input type="time" name="sub_start" value="{{hm $r.FireAt}}"></label>
-      </div>
-      <div class="weekdays" data-show="weekly">
-        {{range $i, $n := weekdays}}
-        <label class="chip"><input type="checkbox" name="weekdays" value="{{$i}}" {{if has $rp.Weekdays $i}}checked{{end}}> {{$n}}</label>
-        {{end}}
-      </div>
-      <div class="row gap wrap" data-show="hourly minutely">
-        <label>Only between <input type="time" name="window_start" value="{{$fd.WinStart}}"></label>
-        <label>and <input type="time" name="window_end" value="{{$fd.WinEnd}}"></label>
-        <span class="muted small">(optional active window)</span>
-      </div>
-      <div class="row gap wrap">
-        <label>Starts on <input type="date" name="start_date" value="{{$fd.StartDate}}"></label>
-        <label>Ends on <input type="date" name="until" value="{{$rp.Until}}"> <span class="muted small">optional</span></label>
-        <label>Max times <input type="number" class="num" name="count" min="0" value="{{if $rp.Count}}{{$rp.Count}}{{end}}" placeholder="∞"></label>
-      </div>
-      <p class="muted small" data-show="monthly">Day 29–31 fires on the last day in shorter months.</p>
-    </div>
-  </fieldset>
-
-  <fieldset>
-    <legend>Nag mode</legend>
-    <label class="check-label"><input type="checkbox" name="nag" {{if $r.NagEnabled}}checked{{end}}> Remind me again until I press Done or Snooze</label>
-    <label>Every <input type="number" class="num" name="nag_interval" min="1" max="1440" value="{{$r.NagIntervalMin}}"> minutes</label>
-  </fieldset>
-
-  <fieldset data-switch>
-    <legend>Quiet hours</legend>
-    <div class="row gap wrap">
-      <label class="chip"><input type="radio" name="quiet_mode" value="global" data-switch-source {{if eq $fd.QuietMode "global"}}checked{{end}}> Use global setting</label>
-      <label class="chip"><input type="radio" name="quiet_mode" value="off" data-switch-source {{if eq $fd.QuietMode "off"}}checked{{end}}> No quiet hours</label>
-      <label class="chip"><input type="radio" name="quiet_mode" value="custom" data-switch-source {{if eq $fd.QuietMode "custom"}}checked{{end}}> Custom</label>
-    </div>
-    <div class="row gap" data-show="custom">
-      <label>From <input type="time" name="quiet_start" value="{{$fd.QuietStart}}"></label>
-      <label>to <input type="time" name="quiet_end" value="{{$fd.QuietEnd}}"></label>
-    </div>
-    <label class="check-label"><input type="checkbox" name="ignore_quiet" {{if $r.IgnoreQuietHours}}checked{{end}}> Ignore quiet hours (send even at night)</label>
-  </fieldset>
-
-  <label class="check-label"><input type="checkbox" name="enabled" {{if $r.Enabled}}checked{{end}}> Enabled</label>
-
-  <div class="row gap wrap">
-    <button class="btn primary">Save</button>
-    <a class="btn" href="/reminders">Cancel</a>
-  </div>
-</form>
-
-{{if $r.ID}}
-<div class="row gap wrap actions-row">
-  <form method="post" action="/reminders/{{$r.ID}}/{{if $r.Enabled}}pause{{else}}resume{{end}}"><input type="hidden" name="csrf_token" value="{{.CSRF}}"><input type="hidden" name="back" value="/reminders/{{$r.ID}}"><button class="btn">{{if $r.Enabled}}⏸ Pause{{else}}▶ Resume{{end}}</button></form>
-  <form method="post" action="/reminders/{{$r.ID}}/delete" data-confirm="Delete this reminder? Its history is kept."><input type="hidden" name="csrf_token" value="{{.CSRF}}"><button class="btn danger">Delete</button></form>
-  {{if $r.NextFireAt}}<span class="muted">Next: {{dt $r.NextFireAt}}</span>{{end}}
+  {{if .History}}
+  <section class="section">
+    <div class="section-label">History</div>
+    {{range .History}}{{template "occ" (dict "Data" . "CSRF" $.CSRF)}}{{end}}
+  </section>
+  {{end}}
+  {{end}}
 </div>
-{{if .History}}
-<section>
-  <h2>History</h2>
-  {{range .History}}{{template "occ" (dict "Data" . "CSRF" $.CSRF)}}{{end}}
-</section>
-{{end}}
-{{end}}
 {{end}}

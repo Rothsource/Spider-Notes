@@ -1,6 +1,6 @@
-# Mynotes
+# Spider Notes 🕷️
 
-A self-hosted personal **to-do list, reminder, calendar and memo** app for one person.
+Spider Notes is a self-hosted personal **to-do list, reminder, calendar and memo** app for one person.
 It is a single Go binary with SQLite, a server-rendered web UI (htmx), and a
 **send-only Telegram bot** that delivers reminders with ✅ Done / ⏰ Snooze / ⏭ Skip buttons.
 
@@ -120,7 +120,7 @@ only sets `deleted_at`, and open occurrences of a deleted reminder are closed as
 
 ## Backup and restore
 
-The database is one file on the `mynotes-data` volume. Make a consistent online
+The database is one file on the `spider-notes-data` volume. Make a consistent online
 backup (`VACUUM INTO`) while the app is running:
 
 ```bash
@@ -137,7 +137,7 @@ docker compose cp ./backup-2026-10-29.db app:/data/app.db
 docker compose start app
 ```
 
-(If the copied file ends up owned by root, run `docker compose run --rm --user root --entrypoint /bin/sh app` with an image that has a shell, or restore into the volume with a helper container such as `docker run --rm -v mynotes_mynotes-data:/data -v $PWD:/b alpine sh -c "cp /b/backup.db /data/app.db && chown 65532:65532 /data/app.db && rm -f /data/app.db-wal /data/app.db-shm"`.)
+(If the copied file ends up owned by root, run `docker compose run --rm --user root --entrypoint /bin/sh app` with an image that has a shell, or restore into the volume with a helper container such as `docker run --rm -v spider-notes_spider-notes-data:/data -v $PWD:/b alpine sh -c "cp /b/backup.db /data/app.db && chown 65532:65532 /data/app.db && rm -f /data/app.db-wal /data/app.db-shm"`.)
 
 Back up the `.env` file too: it holds the session secret and the initial credentials.
 
