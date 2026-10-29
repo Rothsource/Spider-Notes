@@ -8,6 +8,9 @@ It is a single Go binary with SQLite, a server-rendered web UI (htmx), and a
 - Data stays on your server in one SQLite file.
 - It ships with a JSON API (`/api/v1`) and an OpenAPI description, so an LLM or a script can use it later.
 
+📚 **Full documentation:** [docs/](docs/README.md): user guide, reminders, Telegram,
+deployment, configuration, operations, architecture, data model, API, security and development.
+
 ---
 
 ## Pages
