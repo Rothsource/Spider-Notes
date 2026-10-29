@@ -220,3 +220,32 @@ func (s *Service) ExpenseTotals(ctx context.Context, from, to time.Time) (Expens
 	}
 	return SummarizeExpenses(list), nil
 }
+
+// ParseQuickAmount reads an amount typed on its own: "4.5", "$4.50", "8000r",
+// "8,000 riel". Currency is "" when no mark is given.
+func ParseQuickAmount(text string) (amount, currency string, err error) {
+	bad := model.Invalid("Send just the amount, e.g. 4.5 or 8000r")
+	tokens := strings.Fields(text)
+	if len(tokens) == 0 || len(tokens) > 2 {
+		return "", "", bad
+	}
+	m := quickAmountRe.FindStringSubmatch(tokens[0])
+	if m == nil {
+		return "", "", bad
+	}
+	amount = m[2]
+	if m[3] != "" {
+		amount += "." + m[3]
+	}
+	currency = quickCurrency(m[1])
+	if m[4] != "" {
+		currency = quickCurrency(m[4])
+	}
+	if len(tokens) == 2 {
+		if currency != "" || !quickCurRe.MatchString(tokens[1]) {
+			return "", "", bad
+		}
+		currency = quickCurrency(tokens[1])
+	}
+	return amount, currency, nil
+}

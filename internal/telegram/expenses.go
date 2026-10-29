@@ -23,42 +23,61 @@ var expenseCallbackRe = regexp.MustCompile(`^e:([1-9][0-9]{0,17}):(u|x|cats|c[1-
 const maxCategoryButtons = 24
 
 func helpText(currency string) string {
-	return "💸 Log an expense by sending a message:\n" +
+	return "💸 Tap ➕ Add expense below and answer: what, how much, category.\n\n" +
+		"Or send it in one message:\n" +
 		"• lunch 4.5\n" +
 		"• tuk tuk 8000r   (r, ៛ or riel = KHR · $ = USD)\n" +
 		"• coffee 2.25 #food @aba   (#category, @payment)\n" +
 		"Without a currency mark I use the last one you used (now " + currency + ").\n" +
 		"The date and time are recorded automatically.\n\n" +
 		"/today · /week · /month: totals\n" +
-		"/help: this message"
+		"/cancel: stop an entry · /help: this message"
 }
 
 // handleMessage handles a text message from the owner: a command or an expense.
 func (b *Bot) handleMessage(ctx context.Context, c Client, chatID int64, m *tgbotapi.Message) {
 	text := strings.TrimSpace(m.Text)
-	if text == "" {
-		b.send(c, chatID, "Send an expense as text, e.g. lunch 4.5\n/help for more.", nil)
+	switch text {
+	case "":
+		b.sendMain(c, chatID, "Tap ➕ Add expense, or send e.g. lunch 4.5")
+		return
+	case btnAdd:
+		b.startFlow(c, chatID)
+		return
+	case btnToday:
+		b.sendMain(c, chatID, b.totalsText(ctx, "today"))
+		return
+	case btnMonth:
+		b.sendMain(c, chatID, b.totalsText(ctx, "month"))
 		return
 	}
 	if strings.HasPrefix(text, "/") {
 		cmd, _, _ := strings.Cut(strings.Fields(text)[0], "@") // "/today@MyBot" in groups
-		switch strings.ToLower(cmd) {
+		switch cmd = strings.ToLower(cmd); cmd {
+		case "/add":
+			b.startFlow(c, chatID)
+		case "/cancel":
+			b.setDraft(chatID, nil)
+			b.sendMain(c, chatID, "✖ Cancelled.")
 		case "/today", "/week", "/month":
-			b.send(c, chatID, b.totalsText(ctx, strings.TrimPrefix(strings.ToLower(cmd), "/")), nil)
+			b.sendMain(c, chatID, b.totalsText(ctx, strings.TrimPrefix(cmd, "/")))
 		default:
-			b.send(c, chatID, helpText(b.svc.LastCurrency(ctx)), nil)
+			b.sendMain(c, chatID, helpText(b.svc.LastCurrency(ctx)))
 		}
+		return
+	}
+	if b.continueFlow(ctx, c, chatID, text) {
 		return
 	}
 	e, err := b.svc.CreateQuickExpense(ctx, text)
 	if err != nil {
 		var ve *model.ValidationError
 		if errors.As(err, &ve) {
-			b.send(c, chatID, "🤔 "+ve.Msg+"\n/help for examples.", nil)
+			b.sendMain(c, chatID, "🤔 "+ve.Msg+"\nOr tap ➕ Add expense and I'll ask step by step.")
 			return
 		}
 		slog.Error("telegram expense", "err", err)
-		b.send(c, chatID, "Something went wrong, try again.", nil)
+		b.sendMain(c, chatID, "Something went wrong, try again.")
 		return
 	}
 	cats, _ := b.svc.ListExpenseCategories(ctx)

@@ -78,6 +78,7 @@ type Bot struct {
 	chatID  int64
 	cancel  context.CancelFunc
 	baseCtx context.Context
+	drafts  map[int64]*draft // open guided expense entries per chat
 
 	retryBase time.Duration
 }
@@ -87,7 +88,7 @@ func New(svc *service.Service, f Factory) *Bot {
 	if f == nil {
 		f = DefaultFactory
 	}
-	return &Bot{svc: svc, factory: f, queue: make(chan job, 1000), retryBase: time.Second}
+	return &Bot{svc: svc, factory: f, queue: make(chan job, 1000), drafts: map[int64]*draft{}, retryBase: time.Second}
 }
 
 var _ service.Notifier = (*Bot)(nil)
@@ -162,6 +163,7 @@ func (b *Bot) connectAndPoll(ctx context.Context, token string) {
 	slog.Info("telegram connected")
 	// The "/" menu in the chat (best effort).
 	if _, err := c.Request(tgbotapi.NewSetMyCommands(
+		tgbotapi.BotCommand{Command: "add", Description: "Add an expense step by step"},
 		tgbotapi.BotCommand{Command: "today", Description: "Spent today"},
 		tgbotapi.BotCommand{Command: "week", Description: "Spent this week"},
 		tgbotapi.BotCommand{Command: "month", Description: "Spent this month"},
@@ -354,8 +356,12 @@ func (b *Bot) handleCallback(ctx context.Context, c Client, cq *tgbotapi.Callbac
 			slog.Warn("telegram answer callback failed", "err", b.redact(err))
 		}
 	}
-	if strings.HasPrefix(cq.Data, "e:") {
+	switch {
+	case strings.HasPrefix(cq.Data, "e:"):
 		b.handleExpenseCallback(ctx, c, cq, answer)
+		return
+	case strings.HasPrefix(cq.Data, "a:"):
+		b.handleFlowCallback(ctx, c, cq, answer)
 		return
 	}
 	m := callbackRe.FindStringSubmatch(cq.Data)

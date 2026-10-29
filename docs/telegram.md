@@ -64,7 +64,43 @@ For API tokens and connecting other platforms, see [integrations.md](integration
 
 ## Expenses from Telegram
 
-Send the bot a message with **what** and **how much**. The date and time are recorded automatically.
+The date and time of every expense are recorded automatically. Send `/start` once to get
+the button bar under the text box:
+
+```
+[        ➕ Add expense        ]
+[ 📊 Today ]      [ 📅 Month ]
+```
+
+### Step by step
+
+Tap **➕ Add expense** (or send `/add`) and answer three questions:
+
+```
+Bot: 🧾 What did you spend on?             [✖ Cancel]
+You: Lunch
+Bot: 💵 How much for Lunch?
+     e.g. 4.5 · $4.50 · 8000r (without a mark: USD)
+You: 4.5
+Bot: 🏷 Category? Tap one, or type a name.
+     [🍜 Food & Drinks] [🛒 Groceries]
+     [🛺 Transport]     [🛍️ Shopping]   …
+     [⏭ No category]    [✖ Cancel]
+You: (tap 🍜 Food & Drinks)
+Bot: ✅ Saved
+     🧾 Lunch — $4.50
+     🍜 Food & Drinks
+     🕒 Thu 29 Oct 12:30           [🏷 Category] [💱 Riel] [🗑 Undo]
+```
+
+- A wrong amount is simply asked again. Typing a category name (e.g. `drinks`) works like tapping one;
+  a new name becomes a new category.
+- **✖ Cancel** or `/cancel` stops the entry. An unfinished entry expires after 15 minutes.
+- **📊 Today** and **📅 Month** can be tapped at any time, also in the middle of an entry.
+
+### In one message
+
+Or send **what** and **how much** in one message:
 
 | You send | Recorded |
 |---|---|
@@ -105,10 +141,12 @@ Pick a category:
 
 | Command | Shows |
 |---|---|
-| `/today` | Total spent today per currency, then per category |
+| `/add` | Start a step-by-step entry (same as ➕ Add expense) |
+| `/today` | Total spent today per currency, then per category (same as 📊 Today) |
 | `/week` | The same for this week (Monday to Sunday) |
-| `/month` | The same for this month |
-| `/help` | The examples above |
+| `/month` | The same for this month (same as 📅 Month) |
+| `/cancel` | Stop a step-by-step entry |
+| `/help` | The examples above, and shows the button bar again |
 
 Everything recorded here appears on the **Expenses** page and in the Excel export.
 
