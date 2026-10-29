@@ -25,6 +25,7 @@ type Store interface {
 	Notes
 	Attachments
 	Imports
+	Expenses
 
 	// InTx runs fn inside a transaction. The Store passed to fn must be used
 	// for all operations within the transaction.
@@ -164,4 +165,15 @@ type Imports interface {
 // Search runs full-text search.
 type Search interface {
 	Search(ctx context.Context, ftsQuery string, limit int) ([]model.SearchHit, error)
+}
+
+// Expenses persists spending records.
+type Expenses interface {
+	CreateExpense(ctx context.Context, e *model.Expense) error
+	UpdateExpense(ctx context.Context, e *model.Expense) error
+	GetExpense(ctx context.Context, id int64) (*model.Expense, error)
+	ListExpenses(ctx context.Context, f model.ExpenseFilter) ([]model.Expense, error)
+	// ExpenseValues returns the distinct categories or payment methods ("category"/"payment"), most used first.
+	ExpenseValues(ctx context.Context, column string) ([]string, error)
+	SoftDeleteExpense(ctx context.Context, id int64, at time.Time) error
 }

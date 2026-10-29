@@ -147,6 +147,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	p("GET /settings/export.zip", s.exportZip)
 	p("POST /settings/tokens/{id}/revoke", s.revokeToken)
 	s.registerNotes(p)
+	s.registerExpenses(p)
 }
 
 // ---- rendering ----
@@ -329,8 +330,9 @@ func (s *Server) funcs() template.FuncMap {
 			}
 			return false
 		},
-		"add": func(a, b int) int { return a + b },
-		"pct": func(f float64) string { return strconv.Itoa(int(f*100+0.5)) + "%" },
+		"add":   func(a, b int) int { return a + b },
+		"money": model.FormatMoney,
+		"pct":   func(f float64) string { return strconv.Itoa(int(f*100+0.5)) + "%" },
 		"snippet": func(s string) template.HTML {
 			e := template.HTMLEscapeString(s)
 			e = strings.NewReplacer("\x02", "<mark>", "\x03", "</mark>").Replace(e)

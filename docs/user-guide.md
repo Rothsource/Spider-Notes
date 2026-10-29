@@ -107,6 +107,34 @@ See [Reminders & Scheduling](reminders-and-scheduling.md) for exact rules.
   **+ Task** / **+ Reminder** buttons pre-filled with the date. Click an item to edit it.
 - Reminders that fire many times a day (e.g. every 15 minutes) are shown once with a count.
 
+## Expenses
+
+Track what you spend.
+
+- **Add an expense** at the top of the page:
+  - **Item**: what you spent on, e.g. *Lunch*.
+  - **Amount** and **currency**: USD, KHR, THB or EUR. Commas are fine (`12,000`). USD, THB and EUR take
+    up to 2 decimals; KHR takes none. The currency you used last is preselected.
+  - **Category** and **Payment** (e.g. *Food*, *ABA*): type anything; values you used before are suggested.
+  - **When**: leave it empty and the current date and time are recorded automatically.
+  - **Description**: optional notes.
+- **Views**: Day / Week / Month (default) / Year / All, with ‹ › and a date picker.
+  Filter by category or search the text.
+- The **summary** shows the total per currency and the number of expenses. Each day shows
+  its own total. The right-hand panel breaks the period down **by category**; click a
+  category to filter.
+- Click an expense to **edit** or **delete** it. Editing keeps the recorded time unless you change *When*.
+- **Export Excel** downloads the current view (same period, category and search) as an `.xlsx`
+  file. It has two sheets:
+
+  | Sheet | Contents |
+  |---|---|
+  | Expenses | Date & time, Item, Category, Amount, Currency, Payment, Description; oldest first, with filter buttons and a frozen header |
+  | Summary | Totals per currency, then per category with count and share |
+
+  Amounts are real numbers and dates are real dates in Excel, so you can sort, filter,
+  sum and chart them. Currencies are never mixed in a total.
+
 ## History
 
 - **Day / Week / Month** views with previous/next and a date picker.

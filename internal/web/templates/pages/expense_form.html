@@ -1,0 +1,46 @@
+{{define "content"}}
+{{$e := .E}}
+<div class="narrow">
+  <a class="back-link" href="{{.Back}}">{{icon "left"}}Expenses</a>
+  <div class="page-head">
+    <h1>{{if $e.ID}}Edit expense{{else}}New expense{{end}}</h1>
+  </div>
+
+  <form class="card form" method="post" action="{{if $e.ID}}/expenses/{{$e.ID}}{{else}}/expenses{{end}}">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <input type="hidden" name="back" value="{{.Back}}">
+    <input class="title-input" name="item" value="{{$e.Item}}" required maxlength="200" placeholder="What did you spend on?" aria-label="Item" autofocus>
+    <div class="field-grid">
+      <label>{{icon "wallet"}} Amount<input name="amount" value="{{$e.Amount}}" required inputmode="decimal" autocomplete="off" placeholder="0.00"></label>
+      <label>Currency
+        <select name="currency">
+          {{range .Currencies}}<option value="{{.Code}}" {{if eq .Code $e.Currency}}selected{{end}}>{{.Code}} {{.Symbol}}</option>{{end}}
+        </select>
+      </label>
+      <label>{{icon "hash"}} Category<input name="category" value="{{$e.Category}}" list="exp-cats" maxlength="60" placeholder="Food, Transport…"></label>
+      <label>Payment<input name="payment" value="{{$e.Payment}}" list="exp-pays" maxlength="60" placeholder="Cash, ABA, Card…"></label>
+      <label class="span-2">{{icon "clock"}} When<input type="datetime-local" name="spent_at" value="{{if not $e.SpentAt.IsZero}}{{dtlocal $e.SpentAt}}{{end}}"></label>
+    </div>
+    <textarea name="note" rows="4" maxlength="20000" placeholder="Description (optional)" aria-label="Description" data-autosize>{{$e.Note}}</textarea>
+    <datalist id="exp-cats">{{range .Categories}}<option value="{{.}}">{{end}}</datalist>
+    <datalist id="exp-pays">{{range .Payments}}<option value="{{.}}">{{end}}</datalist>
+    <div class="form-actions">
+      <a class="btn ghost" href="{{.Back}}">Cancel</a>
+      <span class="grow"></span>
+      <button class="btn primary">Save</button>
+    </div>
+  </form>
+
+  {{if $e.ID}}
+  <div class="action-strip">
+    <span class="hint">Recorded {{dt $e.CreatedAt}}{{if not ($e.UpdatedAt.Equal $e.CreatedAt)}} · edited {{dt $e.UpdatedAt}}{{end}}</span>
+    <span class="grow"></span>
+    <form method="post" action="/expenses/{{$e.ID}}/delete" data-confirm="Delete this expense?">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <input type="hidden" name="back" value="{{.Back}}">
+      <button class="btn danger">{{icon "trash"}}Delete</button>
+    </form>
+  </div>
+  {{end}}
+</div>
+{{end}}

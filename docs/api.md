@@ -79,6 +79,17 @@ the `X-CSRF-Token` header.
 | GET / DELETE | `/attachments/{id}` | Metadata / delete |
 | GET | `/attachments/{id}/content` | Download (supports `Range`) |
 
+### Expenses
+| Method | Path | Description |
+|---|---|---|
+| GET | `/expenses?from=&to=&category=&currency=&q=&limit=` | List, newest first (default limit 500) |
+| POST | `/expenses` | Create `{"item", "amount", "currency", "category", "payment", "note", "spent_at"}`; `spent_at` defaults to now |
+| GET / PUT / DELETE | `/expenses/{id}` | Read / replace (omit `spent_at` to keep it) / delete |
+| GET | `/expenses/summary?from=&to=&category=&currency=&q=` | Totals per currency and per category |
+| GET | `/expenses/export.xlsx?from=&to=&category=&currency=&q=` | Excel download |
+
+`amount` accepts a number (`12.5`) or a string (`"12.50"`).
+
 ### Views
 | Method | Path | Description |
 |---|---|---|
@@ -140,6 +151,10 @@ curl -s -H "$H" -X POST $B/occurrences/42/snooze -d '{"minutes": 30}'
 # Capture a memo and upload a file into a folder
 curl -s -H "$H" -X POST $B/memos -d '{"content_md": "Slept well #health"}'
 curl -s -H "$H" -F folder_id=3 -F file=@report.pdf $B/attachments
+
+# Record an expense and download this month as Excel
+curl -s -H "$H" -X POST $B/expenses -d '{"item": "Lunch", "amount": 4.5, "category": "Food", "payment": "Cash"}'
+curl -s -H "$H" -o expenses.xlsx "$B/expenses/export.xlsx?from=2026-10-01&to=2026-11-01"
 
 # Search everything
 curl -s -H "$H" "$B/search?q=doctor"

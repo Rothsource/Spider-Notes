@@ -10,6 +10,7 @@ one private place they host themselves:
 - **Spider Notes timeline**: fast, Memos-style capture of short notes.
 - **Folders**: nested folders of titled Markdown notes and uploaded files.
 - **History** of everything completed, skipped or missed, with completion rates.
+- **Expenses**: record what you spend, see totals per period and category, export to Excel.
 - **Search** across memos, notes, tasks and reminders.
 - **Export** of everything to plain Markdown files.
 - **JSON API** with personal tokens, described by an OpenAPI file.
@@ -61,6 +62,12 @@ There is exactly one user account. There is no sign-up and there are no roles.
 - Nested folders; titled Markdown notes with Write/Preview tabs and **Ctrl+S** to save.
 - Upload any file (multi-select or drag-and-drop). Images and PDFs open in the browser; other types download.
 - Rename, move and delete every folder, note and file. Deleting a folder deletes its contents.
+
+### Expenses
+- Item, amount, currency (USD, KHR, THB, EUR), category, payment method and description.
+- Date and time are recorded automatically; set them yourself for past spending.
+- Day / week / month / year / all views with totals per currency and a per-category breakdown.
+- **Export Excel** (.xlsx) of the current view: an *Expenses* sheet with filters and a *Summary* sheet.
 
 ### History and statistics
 - Every occurrence outcome with its time and source (web, Telegram, API).

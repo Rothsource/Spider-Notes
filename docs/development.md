@@ -64,6 +64,7 @@ internal/web/            HTML UI: handlers, templates/, static/
 internal/api/            JSON API
 internal/markdown/       Markdown rendering and tags
 internal/memosimport/    Memos importer
+internal/xlsx/           dependency-free Excel (.xlsx) writer for exports
 docs/                    this documentation
 openapi.yaml             API description (embedded, served at /openapi.yaml)
 ```

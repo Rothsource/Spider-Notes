@@ -1,0 +1,105 @@
+{{define "content"}}
+{{$v := .View}}
+<div class="with-rail">
+  <div class="feed">
+    <div class="page-head">
+      <h1>Expenses</h1>
+      <div class="tabs compact">
+        <a class="tab {{if eq $v.Range "day"}}active{{end}}" href="{{$v.URL "/expenses" "range" "day"}}">Day</a>
+        <a class="tab {{if eq $v.Range "week"}}active{{end}}" href="{{$v.URL "/expenses" "range" "week"}}">Week</a>
+        <a class="tab {{if eq $v.Range "month"}}active{{end}}" href="{{$v.URL "/expenses" "range" "month"}}">Month</a>
+        <a class="tab {{if eq $v.Range "year"}}active{{end}}" href="{{$v.URL "/expenses" "range" "year"}}">Year</a>
+        <a class="tab {{if eq $v.Range "all"}}active{{end}}" href="{{$v.URL "/expenses" "range" "all" "date" ""}}">All</a>
+      </div>
+    </div>
+
+    <form class="card form exp-add" method="post" action="/expenses">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <input type="hidden" name="back" value="{{.Back}}">
+      <div class="exp-add-main">
+        <span class="composer-icon">{{icon "wallet"}}</span>
+        <input name="item" required maxlength="200" placeholder="What did you spend on?" aria-label="Item" class="exp-item">
+        <input name="amount" required inputmode="decimal" autocomplete="off" placeholder="0.00" aria-label="Amount" class="exp-amount-input">
+        <select name="currency" aria-label="Currency" class="exp-cur">
+          {{range .Currencies}}<option value="{{.Code}}" {{if eq .Code $.Currency}}selected{{end}}>{{.Code}} {{.Symbol}}</option>{{end}}
+        </select>
+      </div>
+      <div class="field-grid">
+        <label>{{icon "hash"}} Category<input name="category" list="exp-cats" maxlength="60" placeholder="Food, Transport…"></label>
+        <label>{{icon "wallet"}} Payment<input name="payment" list="exp-pays" maxlength="60" placeholder="Cash, ABA, Card…"></label>
+        <label>{{icon "clock"}} When<input type="datetime-local" name="spent_at" title="Leave empty to use the current time"></label>
+      </div>
+      <textarea name="note" rows="2" maxlength="20000" placeholder="Description (optional)" aria-label="Description" data-autosize></textarea>
+      <div class="form-actions">
+        <span class="hint grow">Date and time are recorded automatically unless you set <em>When</em>.</span>
+        <button class="btn primary">{{icon "plus"}}Add expense</button>
+      </div>
+    </form>
+    <datalist id="exp-cats">{{range .Categories}}<option value="{{.}}">{{end}}</datalist>
+    <datalist id="exp-pays">{{range .Payments}}<option value="{{.}}">{{end}}</datalist>
+
+    <form class="filter-bar" method="get" action="/expenses">
+      <input type="hidden" name="range" value="{{$v.Range}}">
+      {{if $v.HasPeriod}}
+      <div class="btn-group">
+        <a class="btn icon-only" href="{{$v.URL "/expenses" "date" $v.Prev}}" aria-label="Previous period">{{icon "left"}}</a>
+        <input type="date" name="date" value="{{iso $v.From}}" aria-label="Date" data-autosubmit>
+        <a class="btn icon-only" href="{{$v.URL "/expenses" "date" $v.Next}}" aria-label="Next period">{{icon "right"}}</a>
+      </div>
+      {{end}}
+      <select name="category" aria-label="Category" data-autosubmit>
+        <option value="">All categories</option>
+        {{range .Categories}}<option value="{{.}}" {{if eq $v.Category .}}selected{{end}}>{{.}}</option>{{end}}
+      </select>
+      <input type="search" name="q" value="{{$v.Query}}" placeholder="Search…" aria-label="Search expenses" class="exp-search">
+      <span class="grow"></span>
+      <a class="btn" href="{{$v.URL "/expenses/export.xlsx"}}" download>{{icon "download"}}Export Excel</a>
+    </form>
+
+    <div class="exp-period">{{if $v.HasPeriod}}{{if eq $v.Range "day"}}{{day $v.From}}{{else}}{{iso $v.From}} → {{iso $v.Last}}{{end}}{{else}}All time{{end}}</div>
+    <div class="summary exp-summary">
+      {{range .Summary.Totals}}<div><strong>{{.Display}}</strong><span>{{.Currency}} · {{.Count}} item{{if ne .Count 1}}s{{end}}</span></div>
+      {{else}}<div><strong>0</strong><span>spent</span></div>{{end}}
+      <div><strong>{{.Summary.Count}}</strong><span>expenses</span></div>
+    </div>
+
+    {{range .Days}}
+    <div class="day-divider exp-day"><span>{{day .Day}}</span><span class="exp-day-total">{{range $i, $t := .Totals}}{{if $i}} · {{end}}{{$t.Display}}{{end}}</span></div>
+    <div class="card list-card">
+      {{range .Items}}
+      <a class="list-row exp-row" href="/expenses/{{.ID}}?back={{$.Back}}">
+        <span class="list-icon">{{icon "wallet"}}</span>
+        <span class="grow">
+          <span class="list-title">{{.Item}}</span>
+          <span class="meta">
+            <span>{{icon "clock"}}{{hm .SpentAt}}</span>
+            {{with .Category}}<span class="pill">{{.}}</span>{{end}}
+            {{with .Payment}}<span>{{.}}</span>{{end}}
+            {{with .Note}}<span class="exp-note">{{firstline .}}</span>{{end}}
+          </span>
+        </span>
+        <span class="exp-amt">{{money .AmountMinor .Currency}}</span>
+      </a>
+      {{end}}
+    </div>
+    {{else}}<div class="empty">{{icon "wallet"}}<p>No expenses in this period. Add one above.</p></div>{{end}}
+  </div>
+
+  <aside class="rail">
+    <div class="rail-section">
+      <div class="section-label">By category</div>
+      {{if .Summary.ByCategory}}
+      <div class="rate-list">
+        {{range .Summary.ByCategory}}
+        <a class="exp-cat" href="{{$v.URL "/expenses" "category" .Category}}">
+          <div class="rate-title"><span>{{or .Category "Uncategorised"}}</span><span class="grow"></span><span class="exp-cat-amt">{{.Display}}</span></div>
+          <div class="rate-bars"><span class="bar" style="--p: {{pct .Share}}"></span><span class="rate-num">{{pct .Share}}</span></div>
+        </a>
+        {{end}}
+      </div>
+      {{else}}<p class="empty-note">Nothing yet.</p>{{end}}
+    </div>
+    {{if $v.Category}}<a class="btn small" href="{{$v.URL "/expenses" "category" ""}}">{{icon "left"}}All categories</a>{{end}}
+  </aside>
+</div>
+{{end}}
