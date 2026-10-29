@@ -51,7 +51,10 @@ type Task struct {
 	ID            int64      `json:"id"`
 	Title         string     `json:"title"`
 	DescriptionMD string     `json:"description_md"`
+	StartAt       *time.Time `json:"start_at"`
 	DueAt         *time.Time `json:"due_at"`
+	Alert         string     `json:"alert"`
+	NextAlertAt   *time.Time `json:"next_alert_at,omitempty"`
 	Priority      string     `json:"priority"`
 	Status        string     `json:"status"`
 	RepeatRule    string     `json:"repeat_rule,omitempty"`

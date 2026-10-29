@@ -68,6 +68,7 @@ func Register(mux *http.ServeMux, svc *service.Service, am *auth.Manager) {
 	h("GET "+p+"/stats", a.stats)
 	h("GET "+p+"/search", a.search)
 	a.registerNotes(h, protect, mux)
+	a.registerExpenses(h, protect, mux)
 	mux.Handle(p+"/", protect(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "unknown endpoint")
 	})))

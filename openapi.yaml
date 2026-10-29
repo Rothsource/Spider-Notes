@@ -24,6 +24,7 @@ tags:
   - name: occurrences
   - name: memos
   - name: notes
+  - name: expenses
   - name: views
 
 paths:
@@ -470,6 +471,117 @@ paths:
         "200": { description: File content, content: { application/octet-stream: { schema: { type: string, format: binary } } } }
         default: { $ref: "#/components/responses/Error" }
 
+  /expenses:
+    get:
+      tags: [expenses]
+      operationId: listExpenses
+      summary: List expenses, newest first
+      parameters:
+        - { $ref: "#/components/parameters/From" }
+        - { $ref: "#/components/parameters/To" }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: currency, in: query, schema: { type: string } }
+        - { name: q, in: query, description: "Text in item, category, payment or note", schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 5000, default: 500 } }
+      responses:
+        "200": { description: Expenses, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Expense" } } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [expenses]
+      operationId: createExpense
+      summary: Record an expense (spent_at defaults to now)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseInput" } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Expense" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /expenses/summary:
+    get:
+      tags: [expenses]
+      operationId: expenseSummary
+      summary: Totals per currency and per category for the same filters as the list
+      parameters:
+        - { $ref: "#/components/parameters/From" }
+        - { $ref: "#/components/parameters/To" }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: currency, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        "200": { description: Summary, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseSummary" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /expenses/export.xlsx:
+    get:
+      tags: [expenses]
+      operationId: exportExpenses
+      summary: Download an Excel workbook (sheets "Expenses" and "Summary") for the same filters as the list
+      parameters:
+        - { $ref: "#/components/parameters/From" }
+        - { $ref: "#/components/parameters/To" }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: currency, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Excel file
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: { schema: { type: string, format: binary } }
+        default: { $ref: "#/components/responses/Error" }
+  /expenses/{id}:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    get:
+      tags: [expenses]
+      operationId: getExpense
+      summary: Get an expense
+      responses:
+        "200": { description: Expense, content: { application/json: { schema: { $ref: "#/components/schemas/Expense" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      tags: [expenses]
+      operationId: updateExpense
+      summary: Replace an expense (omit spent_at to keep the recorded time)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseInput" } } } }
+      responses:
+        "200": { description: Expense, content: { application/json: { schema: { $ref: "#/components/schemas/Expense" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [expenses]
+      operationId: deleteExpense
+      summary: Delete an expense
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /expense-categories:
+    get:
+      tags: [expenses]
+      operationId: listExpenseCategories
+      summary: Categories offered when recording an expense (presets and your own)
+      responses:
+        "200": { description: Categories, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ExpenseCategory" } } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [expenses]
+      operationId: createExpenseCategory
+      summary: Add a category
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseCategoryInput" } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseCategory" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /expense-categories/{id}:
+    parameters: [ { $ref: "#/components/parameters/ID" } ]
+    put:
+      tags: [expenses]
+      operationId: updateExpenseCategory
+      summary: Rename (existing expenses follow) or change the emoji
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseCategoryInput" } } } }
+      responses:
+        "200": { description: Category, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseCategory" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [expenses]
+      operationId: deleteExpenseCategory
+      summary: Remove from the list (expenses keep the name)
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
   /tags:
     get:
       tags: [views]
@@ -619,17 +731,29 @@ components:
       properties:
         title: { type: string, maxLength: 300 }
         description_md: { type: string, maxLength: 20000 }
+        start_at: { type: [string, "null"], format: date-time, description: "Optional start; must not be after due_at. Moves with due_at for repeating tasks." }
         due_at: { type: [string, "null"], format: date-time }
+        alert: { $ref: "#/components/schemas/TaskAlert" }
         priority: { $ref: "#/components/schemas/Priority" }
         tags: { type: array, items: { type: string } }
         repeat: { oneOf: [ { $ref: "#/components/schemas/Repeat" }, { type: "null" } ], description: "daily/weekly/monthly only; requires due_at" }
+    TaskAlert:
+      type: string
+      enum: ["", start, due, 5m, 15m, 30m, 1h, 2h, 1d]
+      description: >-
+        Built-in Telegram alert for each due instance. "" = none, "start" = at start_at,
+        "due" = at due_at, otherwise that long before due_at. Requires due_at ("start" also start_at).
+        Global quiet hours apply; the message has Done / Snooze / Skip buttons.
     Task:
       type: object
       properties:
         id: { type: integer }
         title: { type: string }
         description_md: { type: string }
+        start_at: { type: [string, "null"], format: date-time }
         due_at: { type: [string, "null"], format: date-time }
+        alert: { $ref: "#/components/schemas/TaskAlert" }
+        next_alert_at: { type: [string, "null"], format: date-time, description: "When the next alert is sent (absent when none is scheduled)" }
         priority: { $ref: "#/components/schemas/Priority" }
         status: { type: string, enum: [pending, done] }
         repeat_rule: { type: string, description: RRULE }
@@ -717,6 +841,67 @@ components:
         tags: { type: array, items: { type: string } }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+    ExpenseInput:
+      type: object
+      required: [item, amount]
+      properties:
+        item: { type: string, maxLength: 200, description: "What the money was spent on" }
+        amount: { oneOf: [ { type: number }, { type: string } ], description: "Positive decimal, e.g. 12.5 or \"12.50\". USD/THB/EUR: max 2 decimals; KHR: none" }
+        currency: { type: string, enum: [USD, KHR, THB, EUR], default: USD }
+        category: { type: string, maxLength: 60, description: "A name from /expense-categories; a new name is added to the list" }
+        payment: { type: string, maxLength: 60, description: "e.g. Cash, ABA, Card" }
+        note: { type: string, maxLength: 20000, description: Description }
+        spent_at: { type: [string, "null"], format: date-time, description: "Defaults to now on create; kept when omitted on update" }
+    Expense:
+      type: object
+      properties:
+        id: { type: integer }
+        item: { type: string }
+        amount: { type: string, description: "Decimal string, e.g. \"12.50\"" }
+        amount_minor: { type: integer, description: "Amount in the minor unit (cents, riel)" }
+        currency: { type: string }
+        category: { type: string }
+        payment: { type: string }
+        note: { type: string }
+        spent_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    MoneyTotal:
+      type: object
+      properties:
+        currency: { type: string }
+        amount: { type: string }
+        amount_minor: { type: integer }
+        display: { type: string, description: "Formatted, e.g. $1,234.50 or 8,000៛" }
+        count: { type: integer }
+    ExpenseSummary:
+      type: object
+      properties:
+        count: { type: integer }
+        totals: { type: array, items: { $ref: "#/components/schemas/MoneyTotal" } }
+        by_category:
+          type: array
+          items:
+            allOf:
+              - { $ref: "#/components/schemas/MoneyTotal" }
+              - type: object
+                properties:
+                  category: { type: string }
+                  share: { type: number, description: "Share of the currency total, 0..1" }
+    ExpenseCategoryInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 60 }
+        emoji: { type: string, description: "Optional single emoji" }
+    ExpenseCategory:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        emoji: { type: string }
+        position: { type: integer }
+        created_at: { type: string, format: date-time }
     Attachment:
       type: object
       properties:

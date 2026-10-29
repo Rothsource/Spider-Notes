@@ -580,3 +580,43 @@ a.heat-cell:hover { outline: 1.5px solid var(--accent); }
   .rem { align-items: flex-start; }
   .inline-form { flex-direction: column; }
 }
+
+/* ---- expenses ---- */
+.exp-add { display: flex; flex-direction: column; gap: .75rem; }
+.exp-add-main { display: flex; align-items: center; gap: .5rem; }
+.exp-add-main .exp-item { flex: 1; min-width: 0; font-size: 1.02rem; font-weight: 550; }
+.exp-amount-input { width: 8.5rem; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.exp-cur { width: auto; }
+.exp-search { width: 11rem; }
+.exp-period { color: var(--muted); font-size: .82rem; margin: 0 0 .4rem; }
+.exp-summary { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.exp-summary strong { font-variant-numeric: tabular-nums; }
+.exp-day-total { margin-left: auto; order: 2; color: var(--text-2); text-transform: none; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.exp-day::after { order: 1; }
+.exp-row { align-items: center; }
+.exp-amt { font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: .5rem; }
+.exp-note { max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block !important; }
+.exp-cat { display: block; color: var(--text); border-radius: 8px; padding: .25rem .35rem; margin: -.25rem -.35rem; }
+.exp-cat:hover { background: var(--hover); text-decoration: none; }
+.exp-cat-amt { font-variant-numeric: tabular-nums; color: var(--text-2); font-weight: 600; overflow: visible !important; }
+@media (max-width: 600px) {
+  .exp-add-main { flex-wrap: wrap; }
+  .exp-add-main .exp-item { flex-basis: 100%; }
+  .exp-add-main .composer-icon { display: none; }
+  .exp-amount-input { flex: 1; width: auto; }
+  .exp-search { flex: 1; width: auto; }
+  .exp-note { max-width: 12rem; }
+}
+
+/* ---- expense categories ---- */
+.cat-field { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; color: var(--text-2); font-weight: 500; }
+.cat-field-head { display: flex; align-items: baseline; gap: .5rem; }
+.cat-field-head label { display: inline; }
+.exp-manage { font-size: .78rem; font-weight: 550; margin-left: auto; }
+.cat-field select { width: 100%; }
+.cat-edit { display: flex; align-items: center; gap: .5rem; }
+.cat-edit input { min-width: 0; }
+.cat-emoji-input { width: 3.2rem; text-align: center; font-size: 1.05rem; padding-left: .3rem; padding-right: .3rem; }
+.cat-row { display: flex; align-items: center; gap: .4rem; padding: .35rem .4rem; border-radius: 10px; }
+.cat-row + .cat-row { border-top: 1px solid var(--border); border-radius: 0; }
+.cat-add { display: flex; flex-direction: column; gap: .6rem; }

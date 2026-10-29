@@ -13,7 +13,13 @@
     <textarea name="description" rows="4" maxlength="20000" placeholder="Notes (Markdown)" aria-label="Description" data-autosize>{{$t.DescriptionMD}}</textarea>
 
     <div class="field-grid">
+      <label>{{icon "clock"}} Start<input title="Optional" type="datetime-local" name="start" value="{{dtlocal $t.StartAt}}"></label>
       <label>{{icon "calendar"}} Due<input type="datetime-local" name="due" value="{{dtlocal $t.DueAt}}"></label>
+      <label>{{icon "bell"}} Alert
+        <select name="alert">
+          {{range .Alerts}}<option value="{{.Value}}" {{if eq $t.Alert .Value}}selected{{end}}>{{.Label}}</option>{{end}}
+        </select>
+      </label>
       <label>{{icon "flag"}} Priority
         <select name="priority">
           <option value="low" {{if eq $t.Priority "low"}}selected{{end}}>Low</option>
@@ -46,7 +52,7 @@
         <label data-show="monthly">Day of month<input type="number" name="repeat_monthday" min="1" max="31" value="{{with .Repeat}}{{if .MonthDay}}{{.MonthDay}}{{end}}{{end}}" class="num" placeholder="due day"></label>
         <label>Until (optional)<input type="date" name="repeat_until" value="{{with .Repeat}}{{.Until}}{{end}}"></label>
       </div>
-      <p class="hint" data-show="daily weekly monthly">The time comes from the due date. Completing moves the task to its next occurrence. Days 29–31 fall back to the last day of shorter months.</p>
+      <p class="hint" data-show="daily weekly monthly">The time comes from the due date. Completing moves the task to its next occurrence (the start moves with it). Days 29–31 fall back to the last day of shorter months.</p>
     </div>
 
     <div class="form-actions">

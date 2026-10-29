@@ -64,12 +64,17 @@ empty), the others are still uploaded and the failures are listed.
 
 - **Tabs**: Pending / Done / All. **Chips**: any time, today, this week, overdue, no date.
 - Filter by priority and tag, or search the text.
-- **New task**: title, Markdown notes, due date/time, priority, tags and repeat.
+- **New task**: title, Markdown notes, start and due date/time, alert, priority, tags and repeat.
+  - **Start** (optional) and **Due** give the task a time range, shown as `start → due` in the list.
+  - **Alert** sends a Telegram message with Done / Snooze / Skip buttons: *None*, *At start time*,
+    *At due time*, or 5 min / 15 min / 30 min / 1 h / 2 h / 1 day before the due time.
+    An alert needs a due date. Global quiet hours apply.
   - Repeat: never, daily (every *N* days), weekly (choose weekdays), monthly (day of month), optional end date.
-  - The repeat time comes from the due time.
+  - The repeat time comes from the due time; the start moves along, keeping its distance to the due time.
 - Completing a repeating task records the completion and moves the due date to
   the next occurrence. **Skip occurrence** moves on without completing.
-- **Save & add reminder** opens a reminder pre-filled for that task.
+- **Save & add reminder** opens a reminder pre-filled for that task. Use reminders when you need
+  more than one notification, nag mode, or a custom message; the alert covers the common case.
 - The task page lists its reminders and its history.
 
 ## Reminders
@@ -101,6 +106,44 @@ See [Reminders & Scheduling](reminders-and-scheduling.md) for exact rules.
 - Click a day for the side panel: everything on that day, its memos, and
   **+ Task** / **+ Reminder** buttons pre-filled with the date. Click an item to edit it.
 - Reminders that fire many times a day (e.g. every 15 minutes) are shown once with a count.
+
+## Expenses
+
+Track what you spend.
+
+- **Add an expense** at the top of the page:
+  - **Item**: what you spent on, e.g. *Lunch*.
+  - **Amount** and **currency**: USD, KHR, THB or EUR. Commas are fine (`12,000`). USD, THB and EUR take
+    up to 2 decimals; KHR takes none. The currency you used last is preselected.
+  - **Category**: click the box to open the list. Ready-made: 🍜 Food & Drinks, 🛒 Groceries, 🛺 Transport, 🛍️ Shopping,
+    💡 Bills, 🏠 Rent, 📱 Phone & Internet, 💊 Health, 📚 Education, 🎬 Entertainment, 👪 Family,
+    🎁 Gifts, ✈️ Travel, 📦 Other. Choose **＋ New category…** at the bottom of the list to type a new one;
+    it is added to the list.
+  - **Payment** (optional, e.g. *Cash*, *ABA*): values you used before are suggested.
+  - **Description**: optional notes.
+  - The **date and time are recorded automatically**; there is nothing to fill in.
+- **Manage** (above the category box) opens the category list: add one with an optional emoji,
+  rename it (existing expenses are renamed too), change its emoji, or remove it (expenses keep the name).
+- **Views**: Day / Week / Month (default) / Year / All, with ‹ › and a date picker.
+  Filter by category or search the text.
+- The **summary** shows the total per currency and the number of expenses. Each day shows
+  its own total. The right-hand panel breaks the period down **by category**; click a
+  category to filter.
+- Click an expense to **edit** or **delete** it. The edit page shows the recorded date and time;
+  change it only to correct a mistake.
+- **From Telegram**: tap **➕ Add expense** and answer what / how much / category, or send one
+  message such as `lunch 4.5` or `tuk tuk 8000r #transport`;
+  see [Telegram › Expenses](telegram.md#expenses-from-telegram).
+- **Export Excel** downloads the current view (same period, category and search) as an `.xlsx`
+  file. It has two sheets:
+
+  | Sheet | Contents |
+  |---|---|
+  | Expenses | Date & time, Item, Category, Amount, Currency, Payment, Description; oldest first, with filter buttons and a frozen header |
+  | Summary | Totals per currency, then per category with count and share |
+
+  Amounts are real numbers and dates are real dates in Excel, so you can sort, filter,
+  sum and chart them. Currencies are never mixed in a total.
 
 ## History
 

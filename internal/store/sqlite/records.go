@@ -151,8 +151,9 @@ func (d *DB) ListOccurrences(ctx context.Context, f model.OccurrenceFilter) ([]m
 
 // DueDeliveries implements store.Occurrences.
 func (d *DB) DueDeliveries(ctx context.Context, now time.Time) ([]model.Occurrence, error) {
-	return d.queryOccs(ctx, `SELECT `+occCols+occFrom+`WHERE o.reminder_id IS NOT NULL AND o.status IN ('pending','sent','snoozed')
-		AND o.next_send_at IS NOT NULL AND o.next_send_at <= ? AND r.enabled = 1 AND r.deleted_at IS NULL ORDER BY o.next_send_at`, ft(now))
+	return d.queryOccs(ctx, `SELECT `+occCols+occFrom+`WHERE o.status IN ('pending','sent','snoozed') AND o.next_send_at IS NOT NULL AND o.next_send_at <= ?
+		AND ((o.reminder_id IS NOT NULL AND r.enabled = 1 AND r.deleted_at IS NULL)
+		  OR (o.reminder_id IS NULL AND t.deleted_at IS NULL AND t.status = 'pending')) ORDER BY o.next_send_at`, ft(now))
 }
 
 // ---- memos ----

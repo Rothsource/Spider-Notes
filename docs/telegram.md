@@ -1,7 +1,7 @@
 # Telegram Bot
 
-Spider Notes uses a Telegram bot to deliver reminders. The bot is **send-only**:
-it accepts no commands, and it only reacts to button presses from one chat.
+Spider Notes uses a Telegram bot to deliver reminders and to record expenses.
+It only listens to one chat: yours (`TELEGRAM_CHAT_ID`).
 
 ## Setup
 
@@ -30,6 +30,17 @@ Optional: set the bot's picture with `/setuserpic` in @BotFather using
 ```
 
 - The task line appears for reminders attached to a task.
+- **Task alerts** (the *Alert* field of a task) look like this:
+
+  ```
+  🔔 📋 Write report
+  ▶️ Start Sun 01 Mar 08:00
+  🕒 Due Sun 01 Mar 10:00
+
+  [✅ Done] [⏰ 10m] [⏰ 1h] [⏭ Skip]
+  ```
+
+  Done completes the task; Skip appears only for repeating tasks.
 - The counter appears from the second send onwards (nag mode, snooze).
 - **Skip** appears only for repeating reminders.
 
@@ -41,15 +52,103 @@ result and its buttons are removed, e.g. `✅ Done at 08:20`,
 
 | Rule | Detail |
 |---|---|
-| One chat only | Button presses are accepted only from `TELEGRAM_CHAT_ID`. Everything from other chats is ignored silently. |
-| No commands | Text messages are ignored. The owner's chat gets a single reply, “This bot only sends reminders.” |
-| Validated callbacks | Button data is `o:<occurrence id>:<action>` (under Telegram's 64-byte limit) and must match a strict pattern. |
+| One chat only | Messages and button presses are accepted only from `TELEGRAM_CHAT_ID`. Everything from other chats is ignored silently. |
+| Messages | In your chat, text is read as an expense; `/today`, `/week`, `/month`, `/help` are commands. Nothing else is accepted. |
+| Validated callbacks | Button data is `o:<occurrence id>:<action>` or `e:<expense id>:<action>` (under Telegram's 64-byte limit) and must match a strict pattern. |
 | Idempotent actions | Pressing a button on an already-handled reminder answers “Already handled” and updates the message. |
 | Long polling | The server connects out to Telegram. No webhook, public URL or open port is needed. |
 | Non-blocking delivery | Messages go through an outbox worker with retries, exponential backoff and Telegram's `retry_after` handling. The scheduler never waits on Telegram. |
 | No secrets in logs | The bot token is redacted from all error and library log output. |
 
 For API tokens and connecting other platforms, see [integrations.md](integrations.md).
+
+## Expenses from Telegram
+
+The date and time of every expense are recorded automatically. Send `/start` once to get
+the button bar under the text box:
+
+```
+[        ➕ Add expense        ]
+[ 📊 Today ]      [ 📅 Month ]
+```
+
+### Step by step
+
+Tap **➕ Add expense** (or send `/add`) and answer three questions:
+
+```
+Bot: 🧾 What did you spend on?             [✖ Cancel]
+You: Lunch
+Bot: 💵 How much for Lunch?
+     e.g. 4.5 · $4.50 · 8000r (without a mark: USD)
+You: 4.5
+Bot: 🏷 Category? Tap one, or type a name.
+     [🍜 Food & Drinks] [🛒 Groceries]
+     [🛺 Transport]     [🛍️ Shopping]   …
+     [⏭ No category]    [✖ Cancel]
+You: (tap 🍜 Food & Drinks)
+Bot: ✅ Saved
+     🧾 Lunch — $4.50
+     🍜 Food & Drinks
+     🕒 Thu 29 Oct 12:30           [🏷 Category] [💱 Riel] [🗑 Undo]
+```
+
+- A wrong amount is simply asked again. Typing a category name (e.g. `drinks`) works like tapping one;
+  a new name becomes a new category.
+- **✖ Cancel** or `/cancel` stops the entry. An unfinished entry expires after 15 minutes.
+- **📊 Today** and **📅 Month** can be tapped at any time, also in the middle of an entry.
+
+### In one message
+
+Or send **what** and **how much** in one message:
+
+| You send | Recorded |
+|---|---|
+| `lunch 4.5` | Lunch · $4.50 (last-used currency) |
+| `4.5 lunch` | the same; the order does not matter |
+| `tuk tuk 8000r` · `8000៛ tuk tuk` · `tuk tuk 8000 riel` | Tuk tuk · 8,000៛ |
+| `coffee $2.25 #food @aba` | Coffee · $2.25 · 🍜 Food & Drinks · paid with aba |
+| `rent 300 usd #rent @bank_transfer` | Rent · $300.00 · 🏠 Rent · bank transfer |
+| `2 coffees 3.5` | 2 coffees · $3.50 (the last number is the amount) |
+
+- **Currency marks**: `$`, `usd` → USD · `r`, `៛`, `riel`, `khr` → KHR · `฿`, `baht`, `thb` → THB · `€`, `eur` → EUR.
+  Without a mark, the currency of your last expense is used.
+- **`#category`**: a short word is enough. `#food` and `#drinks` both match *Food & Drinks*; a word that
+  matches nothing becomes a new category. Use `_` for spaces (`#pet_food`).
+- **`@payment`**: e.g. `@cash`, `@aba`. Use `_` for spaces.
+
+The bot answers with what it saved and buttons:
+
+```
+✅ Saved
+🧾 Lunch — $4.50
+🕒 Thu 29 Oct 12:30
+
+Pick a category:
+[🍜 Food & Drinks] [🛒 Groceries]
+[🛺 Transport]     [🛍️ Shopping]   …
+[💱 Riel] [🗑 Undo]
+```
+
+| Button | Does |
+|---|---|
+| a category | Sets the category (shown when you gave none) |
+| 🏷 Category | Shows the category buttons again to change it |
+| 💱 Riel / 💱 Dollar | Re-reads the same number in the other currency (`8000` USD → 8,000៛). Amounts with cents cannot become riel. |
+| 🗑 Undo | Deletes the expense |
+
+**Commands** (also in the `/` menu of the chat):
+
+| Command | Shows |
+|---|---|
+| `/add` | Start a step-by-step entry (same as ➕ Add expense) |
+| `/today` | Total spent today per currency, then per category (same as 📊 Today) |
+| `/week` | The same for this week (Monday to Sunday) |
+| `/month` | The same for this month (same as 📅 Month) |
+| `/cancel` | Stop a step-by-step entry |
+| `/help` | The examples above, and shows the button bar again |
+
+Everything recorded here appears on the **Expenses** page and in the Excel export.
 
 ## Changing or disabling the bot
 

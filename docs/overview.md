@@ -10,6 +10,7 @@ one private place they host themselves:
 - **Spider Notes timeline**: fast, Memos-style capture of short notes.
 - **Folders**: nested folders of titled Markdown notes and uploaded files.
 - **History** of everything completed, skipped or missed, with completion rates.
+- **Expenses**: record what you spend, see totals per period and category, export to Excel.
 - **Search** across memos, notes, tasks and reminders.
 - **Export** of everything to plain Markdown files.
 - **JSON API** with personal tokens, described by an OpenAPI file.
@@ -62,6 +63,12 @@ There is exactly one user account. There is no sign-up and there are no roles.
 - Upload any file (multi-select or drag-and-drop). Images and PDFs open in the browser; other types download.
 - Rename, move and delete every folder, note and file. Deleting a folder deletes its contents.
 
+### Expenses
+- Item, amount, currency (USD, KHR, THB, EUR), category, payment method and description.
+- Ready-made categories with emoji, plus your own; date and time are recorded automatically.
+- Day / week / month / year / all views with totals per currency and a per-category breakdown.
+- **Export Excel** (.xlsx) of the current view: an *Expenses* sheet with filters and a *Summary* sheet.
+
 ### History and statistics
 - Every occurrence outcome with its time and source (web, Telegram, API).
 - Day / week / month views; filter by type, outcome and tag.
@@ -76,7 +83,7 @@ There is exactly one user account. There is no sign-up and there are no roles.
 The following are intentionally not part of the current version. The API and
 schema are kept clean so they can be added later.
 
-- Telegram commands (the bot only sends reminders and handles buttons).
+- Creating tasks or reminders from Telegram (the bot sends reminders and records expenses).
 - Multiple users or shared spaces.
 - External calendar sync (Google Calendar, iCal).
 - AI features (the JSON API and OpenAPI file are ready for LLM tool use).

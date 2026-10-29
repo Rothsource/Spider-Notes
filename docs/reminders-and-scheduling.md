@@ -36,10 +36,11 @@ A background loop runs every `APP_SCHEDULER_INTERVAL` (default 30 s). Each tick:
 
 1. **Materialises due reminders**: for each enabled reminder with `next_fire_at ≤ now`,
    creates an occurrence row and advances `next_fire_at`.
-2. **Processes due tasks**: records task occurrences and advances overdue repeating tasks.
-3. **Expires stale occurrences** (see *missed* below).
-4. **Delivers** occurrences whose `next_send_at ≤ now`, applying quiet hours and nag mode.
-5. Runs the **daily Markdown export** if enabled and due.
+2. **Queues task alerts** for tasks with `next_alert_at ≤ now` (see *Task alerts* below).
+3. **Processes due tasks**: records task occurrences and advances overdue repeating tasks.
+4. **Expires stale occurrences** (see *missed* below).
+5. **Delivers** occurrences whose `next_send_at ≤ now`, applying quiet hours and nag mode.
+6. Runs the **daily Markdown export** if enabled and due.
 
 Every state change is committed to the database **before** a message is queued
 for Telegram. A restart therefore never sends a message twice, and never loses one
@@ -128,9 +129,34 @@ Older ones are recorded as `missed` (up to 50 per reminder) so the history stays
 - Completing the task directly stops the nags of its reminders.
 - If the task is already done or deleted when a reminder fires, no message is sent.
 
+## Task alerts
+
+A task's **alert** is a built-in notification that needs no separate reminder.
+
+| Alert | Fires at |
+|---|---|
+| At start time | the task's start time |
+| At due time | the due time |
+| 5m, 15m, 30m, 1h, 2h, 1d | that long before the due time |
+
+- The alert time is stored in `next_alert_at`. When it arrives, the scheduler sets
+  `next_send_at` on the occurrence row of that due instance, so delivery, quiet hours
+  (global setting), snooze and the Telegram buttons work exactly as for reminders.
+  There is no nag mode for alerts; add a reminder for that.
+- **Done** completes the task (for repeating tasks, the current occurrence); **Skip** skips it;
+  **Snooze** sends the alert again later.
+- Repeating tasks: right after an alert is sent, the next one is scheduled for the next
+  instance, even if the current one is never completed.
+- If the alert time is already past when you save but the task is not due yet, the alert is
+  sent on the next tick. Alerts more than one hour late (e.g. after downtime) are dropped;
+  the overdue task still shows on **Today**.
+- Editing only the title or notes does not re-send an alert; changing the start, due time
+  or alert option recalculates it.
+
 ## Repeating tasks
 
 - Completing or skipping records the occurrence and moves `due_at` to the next occurrence.
+  `start_at` moves by the same amount.
   When the series ends (end date or count reached), the task becomes `done`.
 - If a repeating task is still open when its next occurrence arrives, the old occurrence
   is recorded as `missed` and the task moves on.

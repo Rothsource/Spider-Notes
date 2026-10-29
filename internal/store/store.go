@@ -25,6 +25,7 @@ type Store interface {
 	Notes
 	Attachments
 	Imports
+	Expenses
 
 	// InTx runs fn inside a transaction. The Store passed to fn must be used
 	// for all operations within the transaction.
@@ -78,6 +79,8 @@ type Tasks interface {
 	SoftDeleteTask(ctx context.Context, id int64, at time.Time) error
 	// ListTasksDue returns pending, non-deleted tasks with due_at <= before.
 	ListTasksDue(ctx context.Context, before time.Time) ([]model.Task, error)
+	// ListTaskAlertsDue returns pending, non-deleted tasks with next_alert_at <= now.
+	ListTaskAlertsDue(ctx context.Context, now time.Time) ([]model.Task, error)
 }
 
 // Reminders persists reminders.
@@ -162,4 +165,24 @@ type Imports interface {
 // Search runs full-text search.
 type Search interface {
 	Search(ctx context.Context, ftsQuery string, limit int) ([]model.SearchHit, error)
+}
+
+// Expenses persists spending records.
+type Expenses interface {
+	CreateExpense(ctx context.Context, e *model.Expense) error
+	UpdateExpense(ctx context.Context, e *model.Expense) error
+	GetExpense(ctx context.Context, id int64) (*model.Expense, error)
+	ListExpenses(ctx context.Context, f model.ExpenseFilter) ([]model.Expense, error)
+	// ExpenseValues returns the distinct categories or payment methods ("category"/"payment"), most used first.
+	ExpenseValues(ctx context.Context, column string) ([]string, error)
+	SoftDeleteExpense(ctx context.Context, id int64, at time.Time) error
+
+	ListExpenseCategories(ctx context.Context) ([]model.ExpenseCategory, error)
+	GetExpenseCategory(ctx context.Context, id int64) (*model.ExpenseCategory, error)
+	// FindExpenseCategory looks a category up by name, ignoring case.
+	FindExpenseCategory(ctx context.Context, name string) (*model.ExpenseCategory, error)
+	CreateExpenseCategory(ctx context.Context, c *model.ExpenseCategory) error
+	// UpdateExpenseCategory saves c; when the name changed, expenses using oldName are renamed too.
+	UpdateExpenseCategory(ctx context.Context, c *model.ExpenseCategory, oldName string) error
+	DeleteExpenseCategory(ctx context.Context, id int64) error
 }

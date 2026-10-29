@@ -1,6 +1,6 @@
-// Package telegram implements the send-only Telegram bot: an outbox worker that
-// delivers reminder messages with retries, and a long-polling loop that only
-// handles button presses from the configured chat.
+// Package telegram implements the Telegram bot: an outbox worker that delivers
+// reminder messages with retries, and a long-polling loop that handles button
+// presses and expense messages from the configured chat only.
 package telegram
 
 import (
@@ -50,8 +50,6 @@ var actionCodes = map[string]string{
 
 var callbackRe = regexp.MustCompile(`^o:([1-9][0-9]{0,17}):(d|s10|s60|k)$`)
 
-const replyText = "This bot only sends reminders."
-
 type jobKind int
 
 const (
@@ -79,8 +77,8 @@ type Bot struct {
 	token   string
 	chatID  int64
 	cancel  context.CancelFunc
-	replied map[int64]bool
 	baseCtx context.Context
+	drafts  map[int64]*draft // open guided expense entries per chat
 
 	retryBase time.Duration
 }
@@ -90,7 +88,7 @@ func New(svc *service.Service, f Factory) *Bot {
 	if f == nil {
 		f = DefaultFactory
 	}
-	return &Bot{svc: svc, factory: f, queue: make(chan job, 1000), replied: map[int64]bool{}, retryBase: time.Second}
+	return &Bot{svc: svc, factory: f, queue: make(chan job, 1000), drafts: map[int64]*draft{}, retryBase: time.Second}
 }
 
 var _ service.Notifier = (*Bot)(nil)
@@ -163,6 +161,16 @@ func (b *Bot) connectAndPoll(ctx context.Context, token string) {
 	b.client = c
 	b.mu.Unlock()
 	slog.Info("telegram connected")
+	// The "/" menu in the chat (best effort).
+	if _, err := c.Request(tgbotapi.NewSetMyCommands(
+		tgbotapi.BotCommand{Command: "add", Description: "Add an expense step by step"},
+		tgbotapi.BotCommand{Command: "today", Description: "Spent today"},
+		tgbotapi.BotCommand{Command: "week", Description: "Spent this week"},
+		tgbotapi.BotCommand{Command: "month", Description: "Spent this month"},
+		tgbotapi.BotCommand{Command: "help", Description: "How to log an expense"},
+	)); err != nil {
+		slog.Warn("telegram set commands failed", "err", b.redact(err))
+	}
 	b.poll(ctx, c)
 }
 
@@ -323,8 +331,8 @@ func truncate(s string) string {
 	return s
 }
 
-// HandleUpdate processes one update: button presses from the configured chat;
-// everything else is ignored (with a single polite reply to the owner).
+// HandleUpdate processes one update from the configured chat: button presses,
+// and text messages (expenses and commands). Other chats are ignored silently.
 func (b *Bot) HandleUpdate(ctx context.Context, u tgbotapi.Update) {
 	c, chatID := b.current()
 	if c == nil {
@@ -338,15 +346,7 @@ func (b *Bot) HandleUpdate(ctx context.Context, u tgbotapi.Update) {
 		return
 	}
 	if m := u.Message; m != nil && m.Chat != nil && m.Chat.ID == chatID {
-		b.mu.Lock()
-		first := !b.replied[chatID]
-		b.replied[chatID] = true
-		b.mu.Unlock()
-		if first {
-			if _, err := c.Send(tgbotapi.NewMessage(chatID, replyText)); err != nil {
-				slog.Warn("telegram reply failed", "err", b.redact(err))
-			}
-		}
+		b.handleMessage(ctx, c, chatID, m)
 	}
 }
 
@@ -355,6 +355,14 @@ func (b *Bot) handleCallback(ctx context.Context, c Client, cq *tgbotapi.Callbac
 		if _, err := c.Request(tgbotapi.NewCallback(cq.ID, text)); err != nil {
 			slog.Warn("telegram answer callback failed", "err", b.redact(err))
 		}
+	}
+	switch {
+	case strings.HasPrefix(cq.Data, "e:"):
+		b.handleExpenseCallback(ctx, c, cq, answer)
+		return
+	case strings.HasPrefix(cq.Data, "a:"):
+		b.handleFlowCallback(ctx, c, cq, answer)
+		return
 	}
 	m := callbackRe.FindStringSubmatch(cq.Data)
 	if m == nil {

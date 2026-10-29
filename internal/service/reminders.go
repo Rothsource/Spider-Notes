@@ -276,14 +276,26 @@ func (s *Service) OccurrenceAction(ctx context.Context, id int64, action, source
 		if !o.IsOpen() {
 			return ErrAlreadyHandled
 		}
-		if o.ReminderID == nil { // task occurrence
+		switch action {
+		case ActionSnooze10, ActionSnooze30, ActionSnooze60, ActionSnoozeAM:
+			until := s.snoozeUntil(action, set, now)
+			o.Status, o.SnoozeCount, o.SnoozedUntil, o.NextSendAt, o.ActionSource, o.UpdatedAt = model.OccSnoozed, o.SnoozeCount+1, &until, &until, source, now
+			if err := tx.UpdateOccurrence(ctx, o); err != nil {
+				return err
+			}
+			if o.TelegramMessageID != 0 {
+				s.notify().Finalize(o.TelegramChatID, o.TelegramMessageID, s.finalText(ctx, tx, o))
+			}
+			return nil
+		}
+		if o.ReminderID == nil { // task occurrence (due instance or task alert)
 			switch action {
 			case ActionDone:
 				_, err = s.finishTaskTx(ctx, tx, *o.TaskID, model.OccDone, source)
 			case ActionSkip:
 				_, err = s.finishTaskTx(ctx, tx, *o.TaskID, model.OccSkipped, source)
 			default:
-				return model.Invalid("Task occurrences can only be completed or skipped")
+				return model.Invalid("Unknown action")
 			}
 			if err != nil {
 				return err
@@ -302,16 +314,6 @@ func (s *Service) OccurrenceAction(ctx context.Context, id int64, action, source
 				return model.Invalid("Only repeating reminders can be skipped")
 			}
 			return s.closeOcc(ctx, tx, o, model.OccSkipped, source, now)
-		case ActionSnooze10, ActionSnooze30, ActionSnooze60, ActionSnoozeAM:
-			until := s.snoozeUntil(action, set, now)
-			o.Status, o.SnoozeCount, o.SnoozedUntil, o.NextSendAt, o.ActionSource, o.UpdatedAt = model.OccSnoozed, o.SnoozeCount+1, &until, &until, source, now
-			if err := tx.UpdateOccurrence(ctx, o); err != nil {
-				return err
-			}
-			if o.TelegramMessageID != 0 {
-				s.notify().Finalize(o.TelegramChatID, o.TelegramMessageID, s.finalText(ctx, tx, o))
-			}
-			return nil
 		default:
 			return model.Invalid("Unknown action")
 		}
@@ -392,10 +394,17 @@ func (s *Service) baseText(ctx context.Context, st store.Store, o *model.Occurre
 				b.WriteString("📋 Task: " + r.TaskTitle)
 			}
 		}
-	} else {
-		b.WriteString(o.Title)
+		b.WriteString("\n🕒 " + s.fmtTime(o.ScheduledFor))
+		return b.String()
 	}
-	b.WriteString("\n🕒 " + s.fmtTime(o.ScheduledFor))
+	b.WriteString("📋 " + o.Title)
+	if o.TaskID != nil {
+		if t, err := st.GetTask(ctx, *o.TaskID); err == nil && t.StartAt != nil && t.DueAt != nil {
+			// Start of this instance: the start keeps its distance to the due time.
+			b.WriteString("\n▶️ Start " + s.fmtTime(o.ScheduledFor.Add(-t.DueAt.Sub(*t.StartAt))))
+		}
+	}
+	b.WriteString("\n🕒 Due " + s.fmtTime(o.ScheduledFor))
 	return b.String()
 }
 

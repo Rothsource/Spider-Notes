@@ -143,6 +143,7 @@ func (s *Server) taskForm(w http.ResponseWriter, r *http.Request) {
 	}
 	data["Task"] = t
 	data["Repeat"] = service.RepeatFromRule(t.RepeatRule, "", s.loc)
+	data["Alerts"] = service.TaskAlerts
 	s.render(w, r, "task_form", data)
 }
 
@@ -181,8 +182,12 @@ func (s *Server) taskSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	due, err := s.parseDT(r.FormValue("due"))
-	in := service.TaskInput{Title: r.FormValue("title"), Description: r.FormValue("description"), DueAt: due,
-		Priority: r.FormValue("priority"), Tags: []string{r.FormValue("tags")}}
+	start, serr := s.parseDT(r.FormValue("start"))
+	if err == nil {
+		err = serr
+	}
+	in := service.TaskInput{Title: r.FormValue("title"), Description: r.FormValue("description"), StartAt: start, DueAt: due,
+		Alert: r.FormValue("alert"), Priority: r.FormValue("priority"), Tags: []string{r.FormValue("tags")}}
 	if f := r.FormValue("repeat_freq"); f != "" {
 		in.Repeat = &service.RepeatInput{Freq: f, Interval: formInt(r, "repeat_interval"), Weekdays: formInts(r, "repeat_weekdays"),
 			MonthDay: formInt(r, "repeat_monthday"), Until: r.FormValue("repeat_until"), Count: formInt(r, "repeat_count")}
@@ -202,13 +207,13 @@ func (s *Server) taskSave(w http.ResponseWriter, r *http.Request) {
 		var ve *model.ValidationError
 		if errors.As(err, &ve) {
 			// Re-render the form with the user's input.
-			tt := &model.Task{Title: in.Title, DescriptionMD: in.Description, DueAt: due, Priority: in.Priority}
+			tt := &model.Task{Title: in.Title, DescriptionMD: in.Description, StartAt: start, DueAt: due, Alert: in.Alert, Priority: in.Priority}
 			if id, e := pathID(r); e == nil {
 				tt.ID = id
 			}
 			tt.Tags = strings.FieldsFunc(r.FormValue("tags"), func(c rune) bool { return c == ',' || c == ' ' })
 			w.WriteHeader(http.StatusBadRequest)
-			s.render(w, r, "task_form", page{"Title": "Task", "Task": tt, "Repeat": in.Repeat, "Error": ve.Msg})
+			s.render(w, r, "task_form", page{"Title": "Task", "Task": tt, "Repeat": in.Repeat, "Alerts": service.TaskAlerts, "Error": ve.Msg})
 			return
 		}
 		s.fail(w, r, err)

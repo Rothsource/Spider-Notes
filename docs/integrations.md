@@ -17,7 +17,8 @@ What is **not** available (by design, for a private single-user server):
 - No outgoing webhooks. Other tools *pull* from the API; Spider Notes only *pushes* to Telegram.
 - No OAuth, no per-token scopes and no token expiry. Every API token has full access.
 - No iCal/CalDAV feed. Use `GET /api/v1/calendar` instead.
-- The Telegram bot accepts no text commands, only reminder buttons.
+- The Telegram bot understands expense messages and `/today` `/week` `/month` `/help`;
+  tasks and reminders are created in the web app or through the API.
 
 ---
 

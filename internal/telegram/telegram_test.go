@@ -149,15 +149,146 @@ func TestDeliverAndDoneButton(t *testing.T) {
 	}
 }
 
-func TestMessagesIgnoredAndRepliedOnce(t *testing.T) {
-	_, bot, mc, ctx := setup(t)
-	for i := 0; i < 3; i++ {
-		bot.HandleUpdate(ctx, tgbotapi.Update{Message: &tgbotapi.Message{Text: "/start", Chat: &tgbotapi.Chat{ID: ownerChat}}})
-		bot.HandleUpdate(ctx, tgbotapi.Update{Message: &tgbotapi.Message{Text: "hi", Chat: &tgbotapi.Chat{ID: 777}}})
+func ownerMsg(text string) tgbotapi.Update {
+	return tgbotapi.Update{Message: &tgbotapi.Message{Text: text, Chat: &tgbotapi.Chat{ID: ownerChat}}}
+}
+
+func press(data string, chat int64, msgID int) tgbotapi.Update {
+	return tgbotapi.Update{CallbackQuery: &tgbotapi.CallbackQuery{ID: "cb", Data: data,
+		Message: &tgbotapi.Message{MessageID: msgID, Chat: &tgbotapi.Chat{ID: chat}}}}
+}
+
+func (m *mockClient) lastSent() tgbotapi.MessageConfig {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.sent[len(m.sent)-1]
+}
+
+func (m *mockClient) lastEdit() tgbotapi.EditMessageTextConfig {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.edits[len(m.edits)-1]
+}
+
+func (m *mockClient) lastAnswer() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.answers[len(m.answers)-1].Text
+}
+
+func findButton(t *testing.T, kb tgbotapi.InlineKeyboardMarkup, label string) string {
+	t.Helper()
+	for _, row := range kb.InlineKeyboard {
+		for _, btn := range row {
+			if strings.Contains(btn.Text, label) {
+				if len(*btn.CallbackData) > 64 {
+					t.Fatalf("callback data too long: %q", *btn.CallbackData)
+				}
+				return *btn.CallbackData
+			}
+		}
 	}
-	n, _, _ := mc.snapshot()
-	if n != 1 || mc.sent[0].Text != replyText || mc.sent[0].ChatID != ownerChat {
-		t.Fatalf("want exactly one reply to owner, got %d", n)
+	t.Fatalf("no button %q", label)
+	return ""
+}
+
+func TestExpensesFromChat(t *testing.T) {
+	svc, bot, mc, ctx := setup(t)
+
+	// Other chats are ignored completely.
+	bot.HandleUpdate(ctx, tgbotapi.Update{Message: &tgbotapi.Message{Text: "lunch 4.5", Chat: &tgbotapi.Chat{ID: 777}}})
+	if n, _, _ := mc.snapshot(); n != 0 {
+		t.Fatal("stranger got a reply")
+	}
+	if list, _ := svc.ListExpenses(ctx, model.ExpenseFilter{}); len(list) != 0 {
+		t.Fatal("stranger created an expense")
+	}
+
+	bot.HandleUpdate(ctx, ownerMsg("/start"))
+	if !strings.Contains(mc.lastSent().Text, "lunch 4.5") {
+		t.Fatalf("help: %q", mc.lastSent().Text)
+	}
+	bot.HandleUpdate(ctx, ownerMsg("hello there"))
+	if !strings.Contains(mc.lastSent().Text, "couldn't find an amount") {
+		t.Fatalf("no amount: %q", mc.lastSent().Text)
+	}
+
+	// An expense without a category: saved, with category buttons.
+	bot.HandleUpdate(ctx, ownerMsg("lunch 4.5"))
+	reply := mc.lastSent()
+	list, _ := svc.ListExpenses(ctx, model.ExpenseFilter{})
+	if len(list) != 1 || list[0].Item != "Lunch" || list[0].AmountMinor != 450 || list[0].Currency != "USD" {
+		t.Fatalf("expense %+v", list)
+	}
+	if !strings.Contains(reply.Text, "✅ Saved") || !strings.Contains(reply.Text, "$4.50") || !strings.Contains(reply.Text, "Pick a category") {
+		t.Fatalf("reply %q", reply.Text)
+	}
+	kb := reply.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
+	bot.HandleUpdate(ctx, press(findButton(t, kb, "Food & Drinks"), ownerChat, 10))
+	if e, _ := svc.GetExpense(ctx, list[0].ID); e.Category != "Food & Drinks" {
+		t.Fatalf("category not set: %q", e.Category)
+	}
+	if ed := mc.lastEdit(); !strings.Contains(ed.Text, "🍜 Food & Drinks") || ed.MessageID != 10 {
+		t.Fatalf("edit %q", ed.Text)
+	}
+	// $4.50 cannot become riel.
+	bot.HandleUpdate(ctx, press(findButton(t, kb, "Riel"), ownerChat, 10))
+	if !strings.Contains(mc.lastAnswer(), "Can't switch") {
+		t.Fatalf("answer %q", mc.lastAnswer())
+	}
+
+	// Riel with #category: matched to the preset; switch to dollars; undo.
+	bot.HandleUpdate(ctx, ownerMsg("tuk tuk 8000r #transport @cash"))
+	reply = mc.lastSent()
+	list, _ = svc.ListExpenses(ctx, model.ExpenseFilter{})
+	tuk := list[0]
+	if tuk.Currency != "KHR" || tuk.AmountMinor != 8000 || tuk.Category != "Transport" || tuk.Payment != "cash" {
+		t.Fatalf("tuk %+v", tuk)
+	}
+	kb = reply.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
+	if strings.Contains(reply.Text, "Pick a category") {
+		t.Fatal("category given: no picker expected")
+	}
+	bot.HandleUpdate(ctx, press(findButton(t, kb, "Dollar"), ownerChat, 11))
+	if e, _ := svc.GetExpense(ctx, tuk.ID); e.Currency != "USD" || e.AmountMinor != 800000 {
+		t.Fatalf("switch: %+v", e)
+	}
+	// Next message without a currency uses the last one (USD now).
+	bot.HandleUpdate(ctx, ownerMsg("water 1"))
+	list, _ = svc.ListExpenses(ctx, model.ExpenseFilter{})
+	if list[0].Currency != "USD" {
+		t.Fatalf("default currency %s", list[0].Currency)
+	}
+
+	// A stranger pressing an expense button changes nothing.
+	undo := findButton(t, kb, "Undo")
+	bot.HandleUpdate(ctx, press(undo, 777, 11))
+	if _, err := svc.GetExpense(ctx, tuk.ID); err != nil {
+		t.Fatal("stranger deleted an expense")
+	}
+	bot.HandleUpdate(ctx, press(undo, ownerChat, 11))
+	if _, err := svc.GetExpense(ctx, tuk.ID); !errors.Is(err, model.ErrNotFound) {
+		t.Fatal("undo should delete")
+	}
+	if !strings.Contains(mc.lastEdit().Text, "Deleted") || len(mc.lastEdit().ReplyMarkup.InlineKeyboard) != 0 {
+		t.Fatalf("undo edit %+v", mc.lastEdit())
+	}
+	bot.HandleUpdate(ctx, press(undo, ownerChat, 11)) // again
+	if mc.lastAnswer() != "This expense no longer exists" {
+		t.Fatalf("second undo: %q", mc.lastAnswer())
+	}
+	bot.HandleUpdate(ctx, press("e:1:c1;drop", ownerChat, 11))
+	if mc.lastAnswer() != "Unknown action" {
+		t.Fatalf("tampered: %q", mc.lastAnswer())
+	}
+
+	bot.HandleUpdate(ctx, ownerMsg("/today"))
+	if txt := mc.lastSent().Text; !strings.Contains(txt, "$5.50") || !strings.Contains(txt, "2 expenses") {
+		t.Fatalf("today: %q", txt)
+	}
+	bot.HandleUpdate(ctx, ownerMsg("/month@SpiderBot"))
+	if !strings.Contains(mc.lastSent().Text, "This month") {
+		t.Fatalf("month: %q", mc.lastSent().Text)
 	}
 }
 

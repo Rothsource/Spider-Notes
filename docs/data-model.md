@@ -51,7 +51,7 @@ erDiagram
 
 | Table | Key columns |
 |---|---|
-| `tasks` | title, description_md, due_at, priority (`low`/`normal`/`high`), status (`pending`/`done`), repeat_rule (RRULE), repeat_start_at, completed_at, deleted_at |
+| `tasks` | title, description_md, start_at, due_at, alert (`''`/`start`/`due`/`5m`…`1d`), next_alert_at, priority (`low`/`normal`/`high`), status (`pending`/`done`), repeat_rule (RRULE), repeat_start_at, completed_at, deleted_at |
 | `reminders` | task_id (nullable), message_md, schedule_type (`one_time`/`repeating`), fire_at (time or series start), repeat_rule, active_window, timezone, nag_enabled, nag_interval_min, quiet_hours_override (`''`/`off`/`HH:MM-HH:MM`), ignore_quiet_hours, enabled, next_fire_at, last_sent_at, fire_count, deleted_at |
 | `occurrences` | reminder_id / task_id, scheduled_for, status (`pending`/`sent`/`done`/`snoozed`/`skipped`/`missed`), sent_count, snooze_count, snoozed_until, next_send_at, last_sent_at, done_at, action_source (`web`/`telegram`/`api`/`system`), telegram_chat_id, telegram_message_id |
 
@@ -75,6 +75,15 @@ An attachment with no folder, memo or note belongs to the top level of **Folders
 `tags(id, name UNIQUE)` with join tables `task_tags`, `reminder_tags`, `memo_tags`,
 `note_tags`. Memo and note tags are parsed from `#tags` in the text; task and
 reminder tags are entered in a field. Tag names are lower-case.
+
+### Expenses
+| Table | Key columns | Notes |
+|---|---|---|
+| `expenses` | item, amount_minor, currency (`USD`/`KHR`/`THB`/`EUR`), category, payment, note, spent_at, deleted_at | |
+| `expense_categories` | name (unique, case-insensitive), emoji, position | The category picker. Presets are added by the migration; `expenses.category` stores the name as text |
+
+`amount_minor` is an integer in the currency's smallest unit (USD cents, KHR riel), so
+totals are exact. The API also returns it as a decimal string in `amount`.
 
 ### Imports
 

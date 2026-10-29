@@ -45,7 +45,8 @@
   <a class="task-body" href="/tasks/{{.ID}}">
     <span class="task-title">{{.Title}}</span>
     <span class="meta">
-      {{if .DueAt}}<span class="due">{{icon "calendar"}}{{short .DueAt}}</span>{{end}}
+      {{if .DueAt}}<span class="due">{{icon "calendar"}}{{with .StartAt}}{{short .}} → {{end}}{{short .DueAt}}</span>{{end}}
+      {{if .Alert}}<span title="Telegram alert">{{icon "bell"}}</span>{{end}}
       {{if .RepeatRule}}<span title="{{rule .RepeatRule ""}}">{{icon "repeat"}}{{rule .RepeatRule ""}}</span>{{end}}
       {{if eq .Priority "high"}}<span class="pill danger">{{icon "flag"}}high</span>{{else if eq .Priority "low"}}<span class="pill">low</span>{{end}}
       {{range .Tags}}<span class="tag">#{{.}}</span>{{end}}
@@ -194,3 +195,20 @@
 {{range .Memos}}<div class="memo compact"><div class="memo-time">{{hm .CreatedAt}}</div><div class="md">{{md .ContentMD}}</div></div>{{end}}
 {{end}}
 {{end}}{{end}}
+
+{{/* Expense category dropdown. Args: Cats ([]ExpenseCategory), Sel (selected name), Back (return URL). */}}
+{{define "catpicker"}}
+<div class="cat-field" data-switch>
+  <span class="cat-field-head"><label for="cat-select">Category</label><a class="exp-manage" href="/expense-categories?back={{.Back}}">Manage</a></span>
+  {{$sel := .Sel}}{{$found := eq $sel ""}}
+  <select name="category" id="cat-select" data-switch-source>
+    <option value="" {{if eq $sel ""}}selected{{end}}>Choose a category…</option>
+    {{range .Cats}}{{if eq $sel .Name}}{{$found = true}}{{end}}
+    <option value="{{.Name}}" {{if eq $sel .Name}}selected{{end}}>{{with .Emoji}}{{.}}  {{end}}{{.Name}}</option>
+    {{end}}
+    {{if not $found}}<option value="{{$sel}}" selected>{{$sel}}</option>{{end}}
+    <option value="__new__">＋ New category…</option>
+  </select>
+  <input name="category_new" maxlength="60" placeholder="New category name, e.g. Coffee" aria-label="New category name" data-show="__new__">
+</div>
+{{end}}

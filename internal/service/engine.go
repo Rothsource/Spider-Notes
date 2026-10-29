@@ -31,6 +31,7 @@ func (s *Service) ProcessDue(ctx context.Context) error {
 	for i := range due {
 		logErr("materialize reminder", s.materialize(ctx, due[i].ID, now), "reminder", due[i].ID)
 	}
+	logErr("task alerts", s.processTaskAlerts(ctx, now))
 	logErr("process tasks", s.processTasks(ctx, now))
 	logErr("expire occurrences", s.expireStale(ctx, now))
 
@@ -126,12 +127,17 @@ func (s *Service) deliver(ctx context.Context, id int64, set Settings, now time.
 		if err != nil {
 			return err
 		}
-		if !o.IsOpen() || o.NextSendAt == nil || o.NextSendAt.After(now) || o.ReminderID == nil {
+		if !o.IsOpen() || o.NextSendAt == nil || o.NextSendAt.After(now) {
 			return nil
 		}
-		r, err := liveReminder(ctx, tx, *o.ReminderID)
-		if err != nil || !r.Enabled {
-			return nil //nolint:nilerr // reminder gone or paused: hold
+		// Task alerts have no reminder: global quiet hours, no nagging.
+		r := &model.Reminder{}
+		if o.ReminderID != nil {
+			if r, err = liveReminder(ctx, tx, *o.ReminderID); err != nil || !r.Enabled {
+				return nil //nolint:nilerr // reminder gone or paused: hold
+			}
+		} else if t, err := liveTask(ctx, tx, *o.TaskID); err != nil || t.Status != model.TaskPending {
+			return nil //nolint:nilerr // task gone or done: nothing to send
 		}
 		if hold := s.quietFor(set, r).HoldUntil(now, s.loc); hold.After(now) {
 			o.NextSendAt, o.UpdatedAt = ptr(hold.UTC()), now
@@ -149,9 +155,11 @@ func (s *Service) deliver(ctx context.Context, id int64, set Settings, now time.
 		if err := tx.UpdateOccurrence(ctx, o); err != nil {
 			return err
 		}
-		r.LastSentAt = &now
-		if err := tx.UpdateReminder(ctx, r); err != nil {
-			return err
+		if r.ID != 0 {
+			r.LastSentAt = &now
+			if err := tx.UpdateReminder(ctx, r); err != nil {
+				return err
+			}
 		}
 		msg = &Message{OccurrenceID: o.ID, Text: s.MessageText(ctx, tx, o), AllowSkip: o.Repeating}
 		return nil
