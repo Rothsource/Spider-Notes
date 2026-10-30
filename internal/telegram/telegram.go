@@ -197,7 +197,12 @@ func (b *Bot) poll(ctx context.Context, c Client) {
 			if ctx.Err() != nil {
 				return
 			}
-			slog.Warn("telegram getUpdates failed", "err", b.redact(err))
+			if strings.Contains(err.Error(), "Conflict") {
+				// Telegram gives each update to only one poller: messages get split between copies.
+				slog.Error("telegram: another copy of this bot is running with the same token; stop it, or messages will be lost")
+			} else {
+				slog.Warn("telegram getUpdates failed", "err", b.redact(err))
+			}
 			if !sleep(ctx, delay) {
 				return
 			}
