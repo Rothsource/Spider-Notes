@@ -43,11 +43,13 @@ func TestGuidedExpenseEntry(t *testing.T) {
 		t.Fatalf("currency first: %q", mc.lastSent().Text)
 	}
 	bot.HandleUpdate(ctx, press(findButton(t, inline(t, ask), "Riel"), ownerChat, 5))
-	if ed := mc.lastEdit(); ed.MessageID != 5 || !strings.Contains(ed.Text, "Currency: Riel") || len(ed.ReplyMarkup.InlineKeyboard) != 0 {
-		t.Fatalf("currency chosen: %+v", ed)
+	// The tapped message becomes the amount question: one message, not two.
+	sentBefore, _, _ := mc.snapshot()
+	if ed := mc.lastEdit(); ed.MessageID != 5 || !strings.Contains(ed.Text, "Dinner\nCurrency: Riel\n\nEnter the amount in riel (3/5)") {
+		t.Fatalf("currency + amount question: %q", ed.Text)
 	}
-	if q := mc.lastSent().Text; !strings.Contains(q, "Enter the amount in riel (3/5)") {
-		t.Fatalf("amount question: %q", q)
+	if n, _, _ := mc.snapshot(); n != sentBefore {
+		t.Fatal("no extra message expected")
 	}
 	bot.HandleUpdate(ctx, ownerMsg("16000.50"))
 	if !strings.Contains(mc.lastSent().Text, "no decimals") {
@@ -63,11 +65,8 @@ func TestGuidedExpenseEntry(t *testing.T) {
 		t.Fatalf("category question: %q", ask.Text)
 	}
 	bot.HandleUpdate(ctx, press(findButton(t, inline(t, ask), "Food & Drinks"), ownerChat, 20))
-	if ed := mc.lastEdit(); ed.MessageID != 20 || !strings.Contains(ed.Text, "Category: 🍜 Food & Drinks") {
-		t.Fatalf("category chosen: %q", ed.Text)
-	}
-	if q := mc.lastSent().Text; !strings.Contains(q, "Description (5/5)") {
-		t.Fatalf("description question: %q", q)
+	if ed := mc.lastEdit(); ed.MessageID != 20 || !strings.Contains(ed.Text, "Category: 🍜 Food & Drinks\n\nDescription (5/5)") {
+		t.Fatalf("category + description question: %q", ed.Text)
 	}
 	if list, _ := svc.ListExpenses(ctx, model.ExpenseFilter{}); len(list) != 0 {
 		t.Fatal("must not save before the last step")
@@ -165,7 +164,7 @@ func TestGuidedEntryInGroup(t *testing.T) {
 	}
 	bot.HandleUpdate(ctx, group("Dinner"))
 	bot.HandleUpdate(ctx, press("a:cur:KHR", ownerChat, 3))
-	if q := mc.lastSent(); !strings.Contains(q.Text, "Enter the amount in riel") || !isForceReply(q) {
+	if q := mc.lastSent(); !strings.Contains(q.Text, "Currency: Riel\n\nEnter the amount in riel") || !isForceReply(q) {
 		t.Fatalf("amount should open a reply: %+v", q)
 	}
 	bot.HandleUpdate(ctx, group("16000"))

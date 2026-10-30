@@ -83,17 +83,23 @@ You: Dinner
 Bot: Dinner
      Choose the currency (2/5):
      [Dollar ($)] [Riel (៛)]
-You: (tap Riel)
-Bot: Enter the amount in riel (3/5):
-     Example: 16000
+You: (tap Riel)            the same message becomes:
+Bot: Dinner
+     Currency: Riel
+
+     Enter the amount in riel (3/5):
+     Example: 16000                               [Cancel]
 You: 16000
 Bot: Dinner — 16,000៛
      Choose a category (4/5):
      [🍜 Food & Drinks] [🛒 Groceries]
      [🛺 Transport]     [🛍️ Shopping]   …
      [No category] [Cancel]
-You: (tap Food & Drinks)
-Bot: Description (5/5), optional:
+You: (tap Food & Drinks)   the same message becomes:
+Bot: Dinner — 16,000៛
+     Category: 🍜 Food & Drinks
+
+     Description (5/5), optional:
      Type a note, or tap Save.
      [Save without description] [Cancel]
 You: with family

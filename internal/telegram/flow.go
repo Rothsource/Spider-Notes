@@ -123,6 +123,20 @@ func (b *Bot) ask(c Client, chatID int64, d *draft, text, placeholder string, kb
 	}
 }
 
+// reask turns the message whose button was tapped into the next question, so the
+// answer and the question share one message. In a group the question must open a
+// reply, which an edit cannot do: the old message is deleted and a new one sent.
+func (b *Bot) reask(c Client, chatID int64, msgID int, d *draft, text, placeholder string, kb *tgbotapi.InlineKeyboardMarkup) {
+	if !d.group {
+		b.edit(c, chatID, msgID, text, kb)
+		return
+	}
+	if _, err := c.Request(tgbotapi.NewDeleteMessage(chatID, msgID)); err != nil {
+		slog.Warn("telegram delete failed", "err", b.redact(err))
+	}
+	b.ask(c, chatID, d, text, placeholder, kb)
+}
+
 func cancelOnly() *tgbotapi.InlineKeyboardMarkup {
 	kb := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(cancelButton()))
 	return &kb
@@ -149,16 +163,22 @@ func (b *Bot) askCurrency(c Client, chatID int64, d *draft) {
 	b.send(c, chatID, d.item+"\n\nChoose the currency (2/"+totalSteps+"):", &kb)
 }
 
-func (b *Bot) askAmount(c Client, chatID int64, d *draft, problem string) {
+// amountQuestion is the text and reply placeholder of step 3.
+func amountQuestion(d *draft) (text, placeholder string) {
 	example := "4.50"
 	if d.currency == "KHR" {
 		example = "16000"
 	}
-	text := "Enter the amount in " + strings.ToLower(currencyNames[d.currency]) + " (3/" + totalSteps + "):\nExample: " + example
+	return "Enter the amount in " + strings.ToLower(currencyNames[d.currency]) + " (3/" + totalSteps + "):\nExample: " + example,
+		"Example: " + example
+}
+
+func (b *Bot) askAmount(c Client, chatID int64, d *draft, problem string) {
+	text, placeholder := amountQuestion(d)
 	if problem != "" {
 		text = problem + "\n\n" + text
 	}
-	b.ask(c, chatID, d, text, "Example: "+example, cancelOnly())
+	b.ask(c, chatID, d, text, placeholder, cancelOnly())
 }
 
 func (b *Bot) askCategory(c Client, chatID int64, d *draft, cats []model.ExpenseCategory) {
@@ -186,14 +206,19 @@ func (b *Bot) askCategory(c Client, chatID int64, d *draft, cats []model.Expense
 	b.send(c, chatID, d.item+" — "+priceText(d)+"\n\nChoose a category (4/"+totalSteps+"):\n"+how, &kb)
 }
 
-func (b *Bot) askNote(c Client, chatID int64, d *draft) {
-	text := "Description (5/" + totalSteps + "), optional:\nType a note, or tap Save."
+// noteQuestion is step 5, starting with a summary of the answers so far.
+func noteQuestion(d *draft, cats []model.ExpenseCategory) (string, *tgbotapi.InlineKeyboardMarkup) {
+	cat := "none"
+	if d.category != "" {
+		cat = categoryLabel(cats, d.category)
+	}
+	how := "Type a note, or tap Save."
+	if d.group {
+		how = "Type a note, or send /skip to save without one."
+	}
 	kb := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
 		tgbotapi.NewInlineKeyboardButtonData("Save without description", "a:nonote"), cancelButton()))
-	if d.group {
-		text = "Description (5/" + totalSteps + "), optional:\nType a note, or send /skip to save without one."
-	}
-	b.ask(c, chatID, d, text, "Optional description", &kb)
+	return d.item + " — " + priceText(d) + "\nCategory: " + cat + "\n\nDescription (5/" + totalSteps + "), optional:\n" + how, &kb
 }
 
 func priceText(d *draft) string {
@@ -242,17 +267,25 @@ func (b *Bot) continueFlow(ctx context.Context, c Client, chatID int64, text str
 		b.askCategory(c, chatID, d, cats)
 	case stepCategory:
 		cats, _ := b.svc.ListExpenseCategories(ctx)
-		b.toNote(c, chatID, d, service.MatchCategory(cats, text))
+		b.toNote(ctx, c, chatID, 0, d, service.MatchCategory(cats, text))
 	case stepNote:
 		b.finishFlow(ctx, c, chatID, 0, text)
 	}
 	return true
 }
 
-func (b *Bot) toNote(c Client, chatID int64, d *draft, category string) {
+// toNote stores the category and asks for the description. msgID > 0 turns the
+// tapped category message into the question; otherwise a new message is sent.
+func (b *Bot) toNote(ctx context.Context, c Client, chatID int64, msgID int, d *draft, category string) {
 	d.category, d.step = category, stepNote
 	b.setDraft(chatID, d)
-	b.askNote(c, chatID, d)
+	cats, _ := b.svc.ListExpenseCategories(ctx)
+	text, kb := noteQuestion(d, cats)
+	if msgID > 0 {
+		b.reask(c, chatID, msgID, d, text, "Optional description", kb)
+		return
+	}
+	b.ask(c, chatID, d, text, "Optional description", kb)
 }
 
 // skipStep answers /skip: no category, or no description.
@@ -262,7 +295,7 @@ func (b *Bot) skipStep(ctx context.Context, c Client, chatID int64) {
 	case d == nil:
 		b.sendMain(c, chatID, "Nothing to skip. Tap Add expense to start.")
 	case d.step == stepCategory:
-		b.toNote(c, chatID, d, "")
+		b.toNote(ctx, c, chatID, 0, d, "")
 	case d.step == stepNote:
 		b.finishFlow(ctx, c, chatID, 0, "")
 	default:
@@ -329,8 +362,8 @@ func (b *Bot) handleFlowCallback(ctx context.Context, c Client, cq *tgbotapi.Cal
 		d.currency, d.step = strings.TrimPrefix(code, "cur:"), stepAmount
 		b.setDraft(chatID, d)
 		answer("")
-		b.edit(c, chatID, msgID, d.item+"\nCurrency: "+currencyNames[d.currency], nil)
-		b.askAmount(c, chatID, d, "")
+		text, placeholder := amountQuestion(d)
+		b.reask(c, chatID, msgID, d, d.item+"\nCurrency: "+currencyNames[d.currency]+"\n\n"+text, placeholder, cancelOnly())
 	case code == "nonote":
 		if d.step != stepNote {
 			answer("Answer the question above first")
@@ -342,8 +375,7 @@ func (b *Bot) handleFlowCallback(ctx context.Context, c Client, cq *tgbotapi.Cal
 		answer("Answer the question above first")
 	case code == "nocat":
 		answer("")
-		b.edit(c, chatID, msgID, d.item+" — "+priceText(d)+"\nCategory: none", nil)
-		b.toNote(c, chatID, d, "")
+		b.toNote(ctx, c, chatID, msgID, d, "")
 	default:
 		id, _ := strconv.ParseInt(code[1:], 10, 64)
 		cats, _ := b.svc.ListExpenseCategories(ctx)
@@ -358,8 +390,7 @@ func (b *Bot) handleFlowCallback(ctx context.Context, c Client, cq *tgbotapi.Cal
 			return
 		}
 		answer("")
-		b.edit(c, chatID, msgID, d.item+" — "+priceText(d)+"\nCategory: "+categoryLabel(cats, cat.Name), nil)
-		b.toNote(c, chatID, d, cat.Name)
+		b.toNote(ctx, c, chatID, msgID, d, cat.Name)
 	}
 }
 
