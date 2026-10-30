@@ -42,7 +42,7 @@ func (b *Bot) handleMessage(ctx context.Context, c Client, chatID int64, m *tgbo
 		b.sendMain(c, chatID, "Tap ➕ Add expense, or send e.g. lunch 4.5")
 		return
 	case btnAdd:
-		b.startFlow(c, chatID)
+		b.startFlow(ctx, c, chatID)
 		return
 	case btnToday:
 		b.sendMain(c, chatID, b.totalsText(ctx, "today"))
@@ -55,7 +55,7 @@ func (b *Bot) handleMessage(ctx context.Context, c Client, chatID int64, m *tgbo
 		cmd, _, _ := strings.Cut(strings.Fields(text)[0], "@") // "/today@MyBot" in groups
 		switch cmd = strings.ToLower(cmd); cmd {
 		case "/add":
-			b.startFlow(c, chatID)
+			b.startFlow(ctx, c, chatID)
 		case "/cancel":
 			b.setDraft(chatID, nil)
 			b.sendMain(c, chatID, "✖ Cancelled.")

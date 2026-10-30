@@ -74,27 +74,36 @@ the button bar under the text box:
 
 ### Step by step
 
-Tap **➕ Add expense** (or send `/add`) and answer three questions:
+Tap **➕ Add expense** (or send `/add`) and answer four questions:
 
 ```
-Bot: 🧾 What did you spend on?             [✖ Cancel]
+You: (tap ➕ Add expense)
+Bot: 1/4 🧾 What did you spend on?                       [✖ Cancel]
 You: Lunch
-Bot: 💵 How much for Lunch?
-     e.g. 4.5 · $4.50 · 8000r (without a mark: USD)
-You: 4.5
-Bot: 🏷 Category? Tap one, or type a name.
+Bot: 2/4 💵 How much for Lunch?
+     Tap Dollar or Riel, then type the price (e.g. 4.5).
+     [✅ 💵 Dollar] [៛ Riel]
+You: (tap ៛ Riel if needed), then type 16000
+Bot: 3/4 🏷 Category for Lunch (16,000៛)?
      [🍜 Food & Drinks] [🛒 Groceries]
      [🛺 Transport]     [🛍️ Shopping]   …
      [⏭ No category]    [✖ Cancel]
 You: (tap 🍜 Food & Drinks)
+Bot: 4/4 📝 Description? (optional)
+     Lunch · 16,000៛ · 🍜 Food & Drinks
+     [💾 Save without description]
+You: with the team        (or tap Save without description)
 Bot: ✅ Saved
-     🧾 Lunch — $4.50
+     🧾 Lunch — 16,000៛
      🍜 Food & Drinks
-     🕒 Thu 29 Oct 12:30           [🏷 Category] [💱 Riel] [🗑 Undo]
+     🕒 Thu 29 Oct 12:30           [🏷 Category] [💱 Dollar] [🗑 Undo]
 ```
 
-- A wrong amount is simply asked again. Typing a category name (e.g. `drinks`) works like tapping one;
+- **Dollar or Riel**: the currency of your last expense is preselected (✅). Typing a mark
+  (`$4.50`, `8000r`) also works and wins over the buttons.
+- A wrong price is simply asked again. Typing a category name (e.g. `drinks`) works like tapping one;
   a new name becomes a new category.
+- Nothing is saved until the last step.
 - **✖ Cancel** or `/cancel` stops the entry. An unfinished entry expires after 15 minutes.
 - **📊 Today** and **📅 Month** can be tapped at any time, also in the middle of an entry.
 
