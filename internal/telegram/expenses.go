@@ -23,26 +23,29 @@ var expenseCallbackRe = regexp.MustCompile(`^e:([1-9][0-9]{0,17}):(u|x|cats|c[1-
 const maxCategoryButtons = 24
 
 func helpText(currency string) string {
-	return "💸 Tap ➕ Add expense below and answer: what, how much, category.\n\n" +
-		"Or send it in one message:\n" +
-		"• lunch 4.5\n" +
-		"• tuk tuk 8000r   (r, ៛ or riel = KHR · $ = USD)\n" +
-		"• coffee 2.25 #food @aba   (#category, @payment)\n" +
-		"Without a currency mark I use the last one you used (now " + currency + ").\n" +
-		"The date and time are recorded automatically.\n\n" +
-		"/today · /week · /month: totals\n" +
-		"/cancel: stop an entry · /help: this message"
+	return "To add an expense, tap Add expense and answer the questions.\n\n" +
+		"Or send it in one message, for example:\n" +
+		"lunch 4.5\n" +
+		"tuk tuk 8000r   (r or riel = Riel, $ = Dollar)\n" +
+		"coffee 2.25 #food   (# = category)\n" +
+		"Without $ or r, the last currency is used (now " + currencyName(currency) + ").\n\n" +
+		"/today, /week, /month - totals\n" +
+		"/skip - skip category or description\n" +
+		"/cancel - stop an entry"
 }
 
 // handleMessage handles a text message from the owner: a command or an expense.
 func (b *Bot) handleMessage(ctx context.Context, c Client, chatID int64, m *tgbotapi.Message) {
 	text := strings.TrimSpace(m.Text)
+	if t, ok := legacyButtons[text]; ok {
+		text = t
+	}
 	switch text {
 	case "":
-		b.sendMain(c, chatID, "Tap ➕ Add expense, or send e.g. lunch 4.5")
+		b.sendMain(c, chatID, "Tap Add expense, or send e.g. lunch 4.5")
 		return
 	case btnAdd:
-		b.startFlow(c, chatID)
+		b.startFlow(c, chatID, m.Chat.IsGroup() || m.Chat.IsSuperGroup())
 		return
 	case btnToday:
 		b.sendMain(c, chatID, b.totalsText(ctx, "today"))
@@ -55,10 +58,12 @@ func (b *Bot) handleMessage(ctx context.Context, c Client, chatID int64, m *tgbo
 		cmd, _, _ := strings.Cut(strings.Fields(text)[0], "@") // "/today@MyBot" in groups
 		switch cmd = strings.ToLower(cmd); cmd {
 		case "/add":
-			b.startFlow(c, chatID)
+			b.startFlow(c, chatID, m.Chat.IsGroup() || m.Chat.IsSuperGroup())
+		case "/skip":
+			b.skipStep(ctx, c, chatID)
 		case "/cancel":
 			b.setDraft(chatID, nil)
-			b.sendMain(c, chatID, "✖ Cancelled.")
+			b.sendMain(c, chatID, "Cancelled.")
 		case "/today", "/week", "/month":
 			b.sendMain(c, chatID, b.totalsText(ctx, strings.TrimPrefix(cmd, "/")))
 		default:
@@ -73,7 +78,7 @@ func (b *Bot) handleMessage(ctx context.Context, c Client, chatID int64, m *tgbo
 	if err != nil {
 		var ve *model.ValidationError
 		if errors.As(err, &ve) {
-			b.sendMain(c, chatID, "🤔 "+ve.Msg+"\nOr tap ➕ Add expense and I'll ask step by step.")
+			b.sendMain(c, chatID, ve.Msg+"\nOr tap Add expense and I'll ask step by step.")
 			return
 		}
 		slog.Error("telegram expense", "err", err)
@@ -82,7 +87,7 @@ func (b *Bot) handleMessage(ctx context.Context, c Client, chatID int64, m *tgbo
 	}
 	cats, _ := b.svc.ListExpenseCategories(ctx)
 	kb := expenseKeyboard(e, cats, false)
-	b.send(c, chatID, expenseText(b.svc, e, cats, "✅ Saved"), &kb)
+	b.send(c, chatID, expenseText(b.svc, e, cats, "Saved"), &kb)
 }
 
 func (b *Bot) send(c Client, chatID int64, text string, kb *tgbotapi.InlineKeyboardMarkup) {
@@ -112,25 +117,24 @@ func categoryLabel(cats []model.ExpenseCategory, name string) string {
 			return c.Emoji + " " + name
 		}
 	}
-	return "🏷 " + name
+	return name
 }
 
 func expenseText(svc *service.Service, e *model.Expense, cats []model.ExpenseCategory, header string) string {
 	var b strings.Builder
-	b.WriteString(header + "\n🧾 " + e.Item + " — " + model.FormatMoney(e.AmountMinor, e.Currency))
-	var extra []string
+	b.WriteString(header + "\n" + e.Item + " — " + model.FormatMoney(e.AmountMinor, e.Currency))
 	if e.Category != "" {
-		extra = append(extra, categoryLabel(cats, e.Category))
+		b.WriteString("\nCategory: " + categoryLabel(cats, e.Category))
 	}
 	if e.Payment != "" {
-		extra = append(extra, "💳 "+e.Payment)
+		b.WriteString("\nPayment: " + e.Payment)
 	}
-	if len(extra) > 0 {
-		b.WriteString("\n" + strings.Join(extra, " · "))
+	if e.Note != "" {
+		b.WriteString("\nDescription: " + e.Note)
 	}
-	b.WriteString("\n🕒 " + e.SpentAt.In(svc.Location()).Format("Mon 02 Jan 15:04"))
+	b.WriteString("\n" + e.SpentAt.In(svc.Location()).Format("Mon 02 Jan, 15:04"))
 	if e.Category == "" {
-		b.WriteString("\n\nPick a category:")
+		b.WriteString("\n\nChoose a category:")
 	}
 	return b.String()
 }
@@ -157,15 +161,15 @@ func expenseKeyboard(e *model.Expense, cats []model.ExpenseCategory, showCats bo
 	}
 	var bottom []tgbotapi.InlineKeyboardButton
 	if !pick {
-		bottom = append(bottom, tgbotapi.NewInlineKeyboardButtonData("🏷 Category", cb("cats")))
+		bottom = append(bottom, tgbotapi.NewInlineKeyboardButtonData("Change category", cb("cats")))
 	}
 	switch e.Currency {
 	case "USD":
-		bottom = append(bottom, tgbotapi.NewInlineKeyboardButtonData("💱 Riel", cb("x")))
+		bottom = append(bottom, tgbotapi.NewInlineKeyboardButtonData("Switch to Riel", cb("x")))
 	case "KHR":
-		bottom = append(bottom, tgbotapi.NewInlineKeyboardButtonData("💱 Dollar", cb("x")))
+		bottom = append(bottom, tgbotapi.NewInlineKeyboardButtonData("Switch to Dollar", cb("x")))
 	}
-	bottom = append(bottom, tgbotapi.NewInlineKeyboardButtonData("🗑 Undo", cb("u")))
+	bottom = append(bottom, tgbotapi.NewInlineKeyboardButtonData("Undo", cb("u")))
 	return tgbotapi.NewInlineKeyboardMarkup(append(rows, bottom)...)
 }
 
@@ -183,32 +187,32 @@ func (b *Bot) handleExpenseCallback(ctx context.Context, c Client, cq *tgbotapi.
 	}
 	chatID, msgID := cq.Message.Chat.ID, cq.Message.MessageID
 	var e *model.Expense
-	header, note := "✅ Updated", ""
+	header, note := "Updated", ""
 	switch code := m[2]; {
 	case code == "u":
 		if e, err = b.svc.GetExpense(ctx, id); err == nil {
 			if err = b.svc.DeleteExpense(ctx, id); err == nil {
-				answer("🗑 Deleted")
-				b.edit(c, chatID, msgID, "🗑 Deleted: "+e.Item+" — "+model.FormatMoney(e.AmountMinor, e.Currency), nil)
+				answer("Deleted")
+				b.edit(c, chatID, msgID, "Deleted: "+e.Item+" — "+model.FormatMoney(e.AmountMinor, e.Currency), nil)
 				return
 			}
 		}
 	case code == "x":
 		if e, err = b.svc.SwitchExpenseCurrency(ctx, id); err == nil {
-			note = "💱 " + e.Currency
+			note = "Switched to " + currencyName(e.Currency)
 		}
 	case code == "cats":
 		if e, err = b.svc.GetExpense(ctx, id); err == nil {
 			cats, _ := b.svc.ListExpenseCategories(ctx)
 			kb := expenseKeyboard(e, cats, true)
 			answer("")
-			b.edit(c, chatID, msgID, expenseText(b.svc, e, cats, "✅ Saved")+"\n\nPick a category:", &kb)
+			b.edit(c, chatID, msgID, expenseText(b.svc, e, cats, "Saved")+"\n\nChoose a category:", &kb)
 			return
 		}
 	default:
 		catID, _ := strconv.ParseInt(code[1:], 10, 64)
 		if e, err = b.svc.SetExpenseCategory(ctx, id, catID); err == nil {
-			note = "🏷 " + e.Category
+			note = "Category: " + e.Category
 		}
 	}
 	var ve *model.ValidationError
@@ -216,7 +220,7 @@ func (b *Bot) handleExpenseCallback(ctx context.Context, c Client, cq *tgbotapi.
 	case err == nil:
 	case errors.Is(err, model.ErrNotFound):
 		answer("This expense no longer exists")
-		b.edit(c, chatID, msgID, "🗑 This expense was deleted.", nil)
+		b.edit(c, chatID, msgID, "This expense was deleted.", nil)
 		return
 	case errors.As(err, &ve):
 		answer(ve.Msg)
@@ -237,16 +241,16 @@ func (b *Bot) totalsText(ctx context.Context, period string) string {
 	now := b.svc.Now()
 	from := b.svc.StartOfDay(now)
 	var to time.Time
-	title := "Today · " + from.Format("Mon 02 Jan")
+	title := "Today (" + from.Format("Mon 02 Jan") + ")"
 	switch period {
 	case "week":
 		from = from.AddDate(0, 0, -((int(from.Weekday()) + 6) % 7))
 		to = from.AddDate(0, 0, 7)
-		title = "This week · from " + from.Format("Mon 02 Jan")
+		title = "This week (from " + from.Format("Mon 02 Jan") + ")"
 	case "month":
 		from = time.Date(from.Year(), from.Month(), 1, 0, 0, 0, 0, from.Location())
 		to = from.AddDate(0, 1, 0)
-		title = "This month · " + from.Format("January 2006")
+		title = "This month (" + from.Format("January 2006") + ")"
 	default:
 		to = from.AddDate(0, 0, 1)
 	}
@@ -256,14 +260,14 @@ func (b *Bot) totalsText(ctx context.Context, period string) string {
 		return "Something went wrong, try again."
 	}
 	if sum.Count == 0 {
-		return "📊 " + title + "\nNothing spent yet."
+		return title + "\nNothing spent yet."
 	}
 	var totals []string
 	for _, t := range sum.Totals {
 		totals = append(totals, t.Display)
 	}
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "📊 %s\n💰 %s  (%d expense%s)\n", title, strings.Join(totals, " · "), sum.Count, map[bool]string{true: "", false: "s"}[sum.Count == 1])
+	fmt.Fprintf(&sb, "%s\nTotal: %s\n%d expense%s\n", title, strings.Join(totals, " + "), sum.Count, map[bool]string{true: "", false: "s"}[sum.Count == 1])
 	cats, _ := b.svc.ListExpenseCategories(ctx)
 	for i, ct := range sum.ByCategory {
 		if i == 12 {
@@ -273,7 +277,7 @@ func (b *Bot) totalsText(ctx context.Context, period string) string {
 		if ct.Category != "" {
 			name = categoryLabel(cats, ct.Category)
 		}
-		sb.WriteString("\n" + name + " — " + ct.Display)
+		sb.WriteString("\n" + name + ": " + ct.Display)
 	}
 	return sb.String()
 }

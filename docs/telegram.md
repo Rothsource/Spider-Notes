@@ -68,35 +68,67 @@ The date and time of every expense are recorded automatically. Send `/start` onc
 the button bar under the text box:
 
 ```
-[        ➕ Add expense        ]
-[ 📊 Today ]      [ 📅 Month ]
+[        Add expense        ]
+[   Today   ] [ This month  ]
 ```
 
 ### Step by step
 
-Tap **➕ Add expense** (or send `/add`) and answer three questions:
+Tap **Add expense** (or send `/add`) and answer five short questions:
 
 ```
-Bot: 🧾 What did you spend on?             [✖ Cancel]
-You: Lunch
-Bot: 💵 How much for Lunch?
-     e.g. 4.5 · $4.50 · 8000r (without a mark: USD)
-You: 4.5
-Bot: 🏷 Category? Tap one, or type a name.
+Bot: New expense (1/5)
+     What did you spend on?                       [Cancel]
+You: Dinner
+Bot: Dinner
+     Choose the currency (2/5):
+     [Dollar ($)] [Riel (៛)]
+You: (tap Riel)            the same message becomes:
+Bot: Dinner
+     Currency: Riel
+
+     Enter the amount in riel (3/5):
+     Example: 16000                               [Cancel]
+You: 16000
+Bot: Dinner — 16,000៛
+     Choose a category (4/5):
      [🍜 Food & Drinks] [🛒 Groceries]
      [🛺 Transport]     [🛍️ Shopping]   …
-     [⏭ No category]    [✖ Cancel]
-You: (tap 🍜 Food & Drinks)
-Bot: ✅ Saved
-     🧾 Lunch — $4.50
-     🍜 Food & Drinks
-     🕒 Thu 29 Oct 12:30           [🏷 Category] [💱 Riel] [🗑 Undo]
+     [No category] [Cancel]
+You: (tap Food & Drinks)   the same message becomes:
+Bot: Dinner — 16,000៛
+     Category: 🍜 Food & Drinks
+
+     Description (5/5), optional:
+     Type a note, or tap Save.
+     [Save without description] [Cancel]
+You: with family
+Bot: Saved
+     Dinner — 16,000៛
+     Category: 🍜 Food & Drinks
+     Description: with family
+     Fri 30 Oct, 20:30
+     [Change category] [Switch to Dollar] [Undo]
 ```
 
-- A wrong amount is simply asked again. Typing a category name (e.g. `drinks`) works like tapping one;
-  a new name becomes a new category.
-- **✖ Cancel** or `/cancel` stops the entry. An unfinished entry expires after 15 minutes.
-- **📊 Today** and **📅 Month** can be tapped at any time, also in the middle of an entry.
+- Riel amounts have no decimals; dollar amounts can have cents (`4.50`). A wrong amount is asked again.
+- Typing a category name (e.g. `drinks`) works like tapping one; a new name becomes a new category.
+- Nothing is saved until the last step. `/skip` skips the category or the description;
+  **Cancel** or `/cancel` stops the entry. An unfinished entry expires after 15 minutes.
+- **Today** and **This month** can be tapped at any time, also in the middle of an entry.
+
+### Using the bot in a group
+
+If `TELEGRAM_CHAT_ID` is a **group** (commands then look like `/add@yourbot`), Telegram's
+*privacy mode* stops the bot from seeing normal messages: it only receives commands,
+button presses and **replies to its own messages**. The bot handles this: in a group,
+every question you answer by typing (what, amount, description) opens a reply
+automatically, so just type and send; use `/skip` and `/cancel` instead of those buttons.
+
+To let the bot read normal group messages too (needed for one-message expenses such as
+`lunch 4.5`), turn privacy mode off: **@BotFather → /setprivacy → your bot → Disable**,
+then remove the bot from the group and add it again. A private chat with the bot needs
+none of this.
 
 ### In one message
 
@@ -141,10 +173,10 @@ Pick a category:
 
 | Command | Shows |
 |---|---|
-| `/add` | Start a step-by-step entry (same as ➕ Add expense) |
-| `/today` | Total spent today per currency, then per category (same as 📊 Today) |
+| `/add` | Start a step-by-step entry (same as Add expense) |
+| `/today` | Total spent today per currency, then per category (same as Today) |
 | `/week` | The same for this week (Monday to Sunday) |
-| `/month` | The same for this month (same as 📅 Month) |
+| `/month` | The same for this month (same as This month) |
 | `/cancel` | Stop a step-by-step entry |
 | `/help` | The examples above, and shows the button bar again |
 

@@ -220,7 +220,7 @@ func TestExpensesFromChat(t *testing.T) {
 	if len(list) != 1 || list[0].Item != "Lunch" || list[0].AmountMinor != 450 || list[0].Currency != "USD" {
 		t.Fatalf("expense %+v", list)
 	}
-	if !strings.Contains(reply.Text, "✅ Saved") || !strings.Contains(reply.Text, "$4.50") || !strings.Contains(reply.Text, "Pick a category") {
+	if !strings.Contains(reply.Text, "Saved") || !strings.Contains(reply.Text, "$4.50") || !strings.Contains(reply.Text, "Choose a category") {
 		t.Fatalf("reply %q", reply.Text)
 	}
 	kb := reply.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
@@ -246,7 +246,7 @@ func TestExpensesFromChat(t *testing.T) {
 		t.Fatalf("tuk %+v", tuk)
 	}
 	kb = reply.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
-	if strings.Contains(reply.Text, "Pick a category") {
+	if strings.Contains(reply.Text, "Choose a category") {
 		t.Fatal("category given: no picker expected")
 	}
 	bot.HandleUpdate(ctx, press(findButton(t, kb, "Dollar"), ownerChat, 11))
