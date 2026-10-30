@@ -167,6 +167,8 @@ func (b *Bot) connectAndPoll(ctx context.Context, token string) {
 		tgbotapi.BotCommand{Command: "today", Description: "Spent today"},
 		tgbotapi.BotCommand{Command: "week", Description: "Spent this week"},
 		tgbotapi.BotCommand{Command: "month", Description: "Spent this month"},
+		tgbotapi.BotCommand{Command: "skip", Description: "Skip category or description"},
+		tgbotapi.BotCommand{Command: "cancel", Description: "Stop the current entry"},
 		tgbotapi.BotCommand{Command: "help", Description: "How to log an expense"},
 	)); err != nil {
 		slog.Warn("telegram set commands failed", "err", b.redact(err))

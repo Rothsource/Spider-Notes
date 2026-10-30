@@ -52,6 +52,7 @@ type draft struct {
 	amount   string
 	currency string // chosen with the Dollar / Riel buttons
 	category string
+	group    bool // a group chat: typed answers must be replies (bot privacy mode)
 	updated  time.Time
 }
 
@@ -100,14 +101,45 @@ func (b *Bot) sendMain(c Client, chatID int64, text string) {
 
 // ---- prompts ----
 
-func (b *Bot) startFlow(ctx context.Context, c Client, chatID int64) {
+func (b *Bot) startFlow(ctx context.Context, c Client, chatID int64, group bool) {
 	cur := b.svc.LastCurrency(ctx)
 	if cur != "KHR" {
 		cur = "USD"
 	}
-	b.setDraft(chatID, &draft{step: stepItem, currency: cur})
+	b.setDraft(chatID, &draft{step: stepItem, currency: cur, group: group})
+	if group {
+		b.askReply(c, chatID, "➕ New expense\n\n1/4 🧾 What did you spend on?\n(/cancel to stop)", "What did you spend on?")
+		return
+	}
 	kb := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(cancelButton()))
 	b.send(c, chatID, "➕ New expense\n\n1/4 🧾 What did you spend on?", &kb)
+}
+
+// askReply sends a question that opens a reply to itself. In groups, bots in
+// privacy mode only receive replies to their own messages, so typed answers
+// must be replies.
+func (b *Bot) askReply(c Client, chatID int64, text, placeholder string) {
+	msg := tgbotapi.NewMessage(chatID, truncate(text))
+	msg.ReplyMarkup = tgbotapi.ForceReply{ForceReply: true, InputFieldPlaceholder: placeholder}
+	if _, err := c.Send(msg); err != nil {
+		slog.Warn("telegram send failed", "err", b.redact(err))
+	}
+}
+
+// skipStep answers /skip: no category, or no description.
+func (b *Bot) skipStep(ctx context.Context, c Client, chatID int64) {
+	d := b.getDraft(chatID)
+	switch {
+	case d == nil:
+		b.sendMain(c, chatID, "Nothing to skip. Tap ➕ Add expense to start.")
+	case d.step == stepCategory:
+		cats, _ := b.svc.ListExpenseCategories(ctx)
+		b.toNote(c, chatID, 0, d, "", cats)
+	case d.step == stepNote:
+		b.finishFlow(ctx, c, chatID, 0, "")
+	default:
+		b.send(c, chatID, "This question can't be skipped.", nil)
+	}
 }
 
 func amountPrompt(d *draft) (string, tgbotapi.InlineKeyboardMarkup) {
@@ -146,7 +178,11 @@ func categoryPrompt(d *draft, cats []model.ExpenseCategory) (string, tgbotapi.In
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 		tgbotapi.NewInlineKeyboardButtonData("⏭ No category", "a:nocat"), cancelButton()))
-	text := "3/4 🏷 Category for " + d.item + " (" + priceText(d) + ")?\nTap one, or type a new name."
+	how := "Tap one, or type a new name."
+	if d.group {
+		how = "Tap one, or reply to this message with a new name."
+	}
+	text := "3/4 🏷 Category for " + d.item + " (" + priceText(d) + ")?\n" + how
 	return text, tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
@@ -190,6 +226,9 @@ func (b *Bot) continueFlow(ctx context.Context, c Client, chatID int64, text str
 		b.setDraft(chatID, d)
 		msg, kb := amountPrompt(d)
 		b.send(c, chatID, msg, &kb)
+		if d.group {
+			b.askReply(c, chatID, "↩️ Price:", "e.g. 4.5 or 8000")
+		}
 	case stepAmount:
 		amount, cur, err := service.ParseQuickAmount(text)
 		if err == nil {
@@ -201,6 +240,9 @@ func (b *Bot) continueFlow(ctx context.Context, c Client, chatID int64, text str
 		if err != nil {
 			msg, kb := amountPrompt(d)
 			b.send(c, chatID, "🤔 "+err.Error()+"\n\n"+msg, &kb)
+			if d.group {
+				b.askReply(c, chatID, "↩️ Price:", "e.g. 4.5 or 8000")
+			}
 			return true
 		}
 		d.amount, d.currency, d.step = amount, cur, stepCategory
@@ -227,6 +269,9 @@ func (b *Bot) toNote(c Client, chatID int64, editMsg int, d *draft, category str
 		b.edit(c, chatID, editMsg, msg, &kb)
 	} else {
 		b.send(c, chatID, msg, &kb)
+	}
+	if d.group {
+		b.askReply(c, chatID, "↩️ Description (or /skip):", "Optional description")
 	}
 }
 

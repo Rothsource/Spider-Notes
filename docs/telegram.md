@@ -104,8 +104,22 @@ Bot: ✅ Saved
 - A wrong price is simply asked again. Typing a category name (e.g. `drinks`) works like tapping one;
   a new name becomes a new category.
 - Nothing is saved until the last step.
-- **✖ Cancel** or `/cancel` stops the entry. An unfinished entry expires after 15 minutes.
+- `/skip` skips the category or the description. **✖ Cancel** or `/cancel` stops the entry.
+  An unfinished entry expires after 15 minutes.
 - **📊 Today** and **📅 Month** can be tapped at any time, also in the middle of an entry.
+
+### Using the bot in a group
+
+If `TELEGRAM_CHAT_ID` is a **group** (commands then look like `/add@yourbot`), Telegram's
+*privacy mode* stops the bot from seeing normal messages: it only receives commands,
+button presses and **replies to its own messages**. The bot handles this: in a group,
+every question you answer by typing (what, price, description) opens a reply
+automatically (`↩️ Price:`), so just type and send.
+
+To let the bot read normal group messages too (needed for one-message expenses such as
+`lunch 4.5`), turn privacy mode off: **@BotFather → /setprivacy → your bot → Disable**,
+then remove the bot from the group and add it again. A private chat with the bot needs
+none of this.
 
 ### In one message
 

@@ -137,3 +137,32 @@ func TestGuidedExpenseEntry(t *testing.T) {
 		t.Fatalf("today button: %q", msg.Text)
 	}
 }
+
+// In groups, bots in privacy mode only get replies to their own messages, so
+// every typed question opens a reply.
+func TestGuidedEntryInGroup(t *testing.T) {
+	svc, bot, mc, ctx := setup(t)
+	group := func(text string) tgbotapi.Update {
+		return tgbotapi.Update{Message: &tgbotapi.Message{Text: text, Chat: &tgbotapi.Chat{ID: ownerChat, Type: "group"}}}
+	}
+	isForceReply := func(m tgbotapi.MessageConfig) bool { _, ok := m.ReplyMarkup.(tgbotapi.ForceReply); return ok }
+
+	bot.HandleUpdate(ctx, group("/add@spideryou_bot"))
+	if q := mc.lastSent(); !strings.Contains(q.Text, "1/4") || !isForceReply(q) {
+		t.Fatalf("item question should open a reply: %+v", q)
+	}
+	bot.HandleUpdate(ctx, group("Dinner"))
+	if q := mc.lastSent(); q.Text != "↩️ Price:" || !isForceReply(q) {
+		t.Fatalf("price should open a reply: %+v", q)
+	}
+	bot.HandleUpdate(ctx, group("16000r"))
+	bot.HandleUpdate(ctx, group("/skip@spideryou_bot")) // no category
+	if q := mc.lastSent(); !strings.Contains(q.Text, "Description") || !isForceReply(q) {
+		t.Fatalf("description should open a reply: %+v", q)
+	}
+	bot.HandleUpdate(ctx, group("/skip")) // no description
+	list, _ := svc.ListExpenses(ctx, model.ExpenseFilter{})
+	if len(list) != 1 || list[0].Item != "Dinner" || list[0].AmountMinor != 16000 || list[0].Currency != "KHR" || list[0].Category != "" {
+		t.Fatalf("saved %+v", list)
+	}
+}
