@@ -18,10 +18,13 @@ import (
 
 // Main keyboard (always under the chat's text box). Tapping a button sends its text.
 const (
-	btnAdd   = "➕ Add expense"
-	btnToday = "📊 Today"
-	btnMonth = "📅 Month"
+	btnAdd   = "Add expense"
+	btnToday = "Today"
+	btnMonth = "This month"
 )
+
+// Button texts of the first version, still on some phones until the keyboard is resent.
+var legacyButtons = map[string]string{"➕ Add expense": btnAdd, "📊 Today": btnToday, "📅 Month": btnMonth}
 
 func mainKeyboard() tgbotapi.ReplyKeyboardMarkup {
 	kb := tgbotapi.NewReplyKeyboard(
@@ -29,19 +32,22 @@ func mainKeyboard() tgbotapi.ReplyKeyboardMarkup {
 		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(btnToday), tgbotapi.NewKeyboardButton(btnMonth)),
 	)
 	kb.ResizeKeyboard = true
-	kb.InputFieldPlaceholder = "Tap ➕ Add expense"
+	kb.InputFieldPlaceholder = "Tap Add expense"
 	return kb
 }
 
-// Guided entry: what → price (dollar or riel) → category → description.
+// Guided entry: what → currency → amount → category → description.
 type step int
 
 const (
 	stepItem step = iota
+	stepCurrency
 	stepAmount
 	stepCategory
 	stepNote
 )
+
+const totalSteps = "5"
 
 // draftTTL is how long an unfinished guided entry waits for the next answer.
 const draftTTL = 15 * time.Minute
@@ -49,8 +55,8 @@ const draftTTL = 15 * time.Minute
 type draft struct {
 	step     step
 	item     string
+	currency string
 	amount   string
-	currency string // chosen with the Dollar / Riel buttons
 	category string
 	group    bool // a group chat: typed answers must be replies (bot privacy mode)
 	updated  time.Time
@@ -59,13 +65,15 @@ type draft struct {
 // Buttons of the guided entry.
 //
 //	cancel     stop the entry
-//	cur:USD    price in dollars / cur:KHR price in riel
+//	cur:USD    dollar / cur:KHR riel
 //	c<id>      category / nocat: no category
 //	nonote     save without a description
 var flowCallbackRe = regexp.MustCompile(`^a:(cancel|cur:(?:USD|KHR)|nocat|nonote|c[1-9][0-9]{0,9})$`)
 
+var currencyNames = map[string]string{"USD": "Dollar", "KHR": "Riel"}
+
 func cancelButton() tgbotapi.InlineKeyboardButton {
-	return tgbotapi.NewInlineKeyboardButtonData("✖ Cancel", "a:cancel")
+	return tgbotapi.NewInlineKeyboardButtonData("Cancel", "a:cancel")
 }
 
 func (b *Bot) getDraft(chatID int64) *draft {
@@ -99,76 +107,68 @@ func (b *Bot) sendMain(c Client, chatID int64, text string) {
 	}
 }
 
-// ---- prompts ----
-
-func (b *Bot) startFlow(ctx context.Context, c Client, chatID int64, group bool) {
-	cur := b.svc.LastCurrency(ctx)
-	if cur != "KHR" {
-		cur = "USD"
-	}
-	b.setDraft(chatID, &draft{step: stepItem, currency: cur, group: group})
-	if group {
-		b.askReply(c, chatID, "➕ New expense\n\n1/4 🧾 What did you spend on?\n(/cancel to stop)", "What did you spend on?")
-		return
-	}
-	kb := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(cancelButton()))
-	b.send(c, chatID, "➕ New expense\n\n1/4 🧾 What did you spend on?", &kb)
-}
-
-// askReply sends a question that opens a reply to itself. In groups, bots in
-// privacy mode only receive replies to their own messages, so typed answers
-// must be replies.
-func (b *Bot) askReply(c Client, chatID int64, text, placeholder string) {
+// ask sends a question that expects a typed answer. In a group it opens a reply
+// (bots in privacy mode only receive replies to their own messages) and the
+// buttons are left out; in a private chat it carries the given buttons.
+func (b *Bot) ask(c Client, chatID int64, d *draft, text, placeholder string, kb *tgbotapi.InlineKeyboardMarkup) {
 	msg := tgbotapi.NewMessage(chatID, truncate(text))
-	msg.ReplyMarkup = tgbotapi.ForceReply{ForceReply: true, InputFieldPlaceholder: placeholder}
+	switch {
+	case d.group:
+		msg.ReplyMarkup = tgbotapi.ForceReply{ForceReply: true, InputFieldPlaceholder: placeholder}
+	case kb != nil:
+		msg.ReplyMarkup = *kb
+	}
 	if _, err := c.Send(msg); err != nil {
 		slog.Warn("telegram send failed", "err", b.redact(err))
 	}
 }
 
-// skipStep answers /skip: no category, or no description.
-func (b *Bot) skipStep(ctx context.Context, c Client, chatID int64) {
-	d := b.getDraft(chatID)
-	switch {
-	case d == nil:
-		b.sendMain(c, chatID, "Nothing to skip. Tap ➕ Add expense to start.")
-	case d.step == stepCategory:
-		cats, _ := b.svc.ListExpenseCategories(ctx)
-		b.toNote(c, chatID, 0, d, "", cats)
-	case d.step == stepNote:
-		b.finishFlow(ctx, c, chatID, 0, "")
-	default:
-		b.send(c, chatID, "This question can't be skipped.", nil)
-	}
+func cancelOnly() *tgbotapi.InlineKeyboardMarkup {
+	kb := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(cancelButton()))
+	return &kb
 }
 
-func amountPrompt(d *draft) (string, tgbotapi.InlineKeyboardMarkup) {
-	usd, khr := "💵 Dollar", "៛ Riel"
-	example := "e.g. 4.5"
-	if d.currency == "KHR" {
-		khr = "✅ " + khr
-		example = "e.g. 8000"
-	} else {
-		usd = "✅ " + usd
+// ---- questions ----
+
+func (b *Bot) startFlow(c Client, chatID int64, group bool) {
+	d := &draft{step: stepItem, group: group}
+	b.setDraft(chatID, d)
+	text := "New expense (1/" + totalSteps + ")\nWhat did you spend on?"
+	if group {
+		text += "\n\nType /cancel to stop."
 	}
-	text := "2/4 💵 How much for " + d.item + "?\n" +
-		"Tap Dollar or Riel, then type the price (" + example + ")."
+	b.ask(c, chatID, d, text, "e.g. Dinner", cancelOnly())
+}
+
+func (b *Bot) askCurrency(c Client, chatID int64, d *draft) {
 	kb := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(usd, "a:cur:USD"),
-			tgbotapi.NewInlineKeyboardButtonData(khr, "a:cur:KHR")),
+			tgbotapi.NewInlineKeyboardButtonData("Dollar ($)", "a:cur:USD"),
+			tgbotapi.NewInlineKeyboardButtonData("Riel (៛)", "a:cur:KHR")),
 		tgbotapi.NewInlineKeyboardRow(cancelButton()))
-	return text, kb
+	b.send(c, chatID, d.item+"\n\nChoose the currency (2/"+totalSteps+"):", &kb)
 }
 
-func categoryPrompt(d *draft, cats []model.ExpenseCategory) (string, tgbotapi.InlineKeyboardMarkup) {
+func (b *Bot) askAmount(c Client, chatID int64, d *draft, problem string) {
+	example := "4.50"
+	if d.currency == "KHR" {
+		example = "16000"
+	}
+	text := "Enter the amount in " + strings.ToLower(currencyNames[d.currency]) + " (3/" + totalSteps + "):\nExample: " + example
+	if problem != "" {
+		text = problem + "\n\n" + text
+	}
+	b.ask(c, chatID, d, text, "Example: "+example, cancelOnly())
+}
+
+func (b *Bot) askCategory(c Client, chatID int64, d *draft, cats []model.ExpenseCategory) {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	var row []tgbotapi.InlineKeyboardButton
-	for i, c := range cats {
+	for i, cat := range cats {
 		if i == maxCategoryButtons {
 			break
 		}
-		row = append(row, tgbotapi.NewInlineKeyboardButtonData(strings.TrimSpace(c.Emoji+" "+c.Name), "a:c"+strconv.FormatInt(c.ID, 10)))
+		row = append(row, tgbotapi.NewInlineKeyboardButtonData(strings.TrimSpace(cat.Emoji+" "+cat.Name), "a:c"+strconv.FormatInt(cat.ID, 10)))
 		if len(row) == 2 {
 			rows, row = append(rows, row), nil
 		}
@@ -177,26 +177,23 @@ func categoryPrompt(d *draft, cats []model.ExpenseCategory) (string, tgbotapi.In
 		rows = append(rows, row)
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("⏭ No category", "a:nocat"), cancelButton()))
+		tgbotapi.NewInlineKeyboardButtonData("No category", "a:nocat"), cancelButton()))
+	kb := tgbotapi.NewInlineKeyboardMarkup(rows...)
 	how := "Tap one, or type a new name."
 	if d.group {
 		how = "Tap one, or reply to this message with a new name."
 	}
-	text := "3/4 🏷 Category for " + d.item + " (" + priceText(d) + ")?\n" + how
-	return text, tgbotapi.NewInlineKeyboardMarkup(rows...)
+	b.send(c, chatID, d.item+" — "+priceText(d)+"\n\nChoose a category (4/"+totalSteps+"):\n"+how, &kb)
 }
 
-func notePrompt(d *draft, cats []model.ExpenseCategory) (string, tgbotapi.InlineKeyboardMarkup) {
-	cat := "no category"
-	if d.category != "" {
-		cat = categoryLabel(cats, d.category)
-	}
-	text := "4/4 📝 Description? (optional)\n" + d.item + " · " + priceText(d) + " · " + cat + "\n" +
-		"Type a note, or tap Save."
+func (b *Bot) askNote(c Client, chatID int64, d *draft) {
+	text := "Description (5/" + totalSteps + "), optional:\nType a note, or tap Save."
 	kb := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("💾 Save without description", "a:nonote")),
-		tgbotapi.NewInlineKeyboardRow(cancelButton()))
-	return text, kb
+		tgbotapi.NewInlineKeyboardButtonData("Save without description", "a:nonote"), cancelButton()))
+	if d.group {
+		text = "Description (5/" + totalSteps + "), optional:\nType a note, or send /skip to save without one."
+	}
+	b.ask(c, chatID, d, text, "Optional description", &kb)
 }
 
 func priceText(d *draft) string {
@@ -219,59 +216,57 @@ func (b *Bot) continueFlow(ctx context.Context, c Client, chatID int64, text str
 	switch d.step {
 	case stepItem:
 		if len([]rune(text)) > service.MaxExpenseItemLen {
-			b.send(c, chatID, "That's too long. What did you spend on? (a few words)", nil)
+			b.ask(c, chatID, d, "That's too long. What did you spend on? (a few words)", "e.g. Dinner", cancelOnly())
 			return true
 		}
-		d.item, d.step = text, stepAmount
+		d.item, d.step = text, stepCurrency
 		b.setDraft(chatID, d)
-		msg, kb := amountPrompt(d)
-		b.send(c, chatID, msg, &kb)
-		if d.group {
-			b.askReply(c, chatID, "↩️ Price:", "e.g. 4.5 or 8000")
-		}
+		b.askCurrency(c, chatID, d)
+	case stepCurrency:
+		b.send(c, chatID, "Please tap Dollar or Riel above first.", nil)
 	case stepAmount:
 		amount, cur, err := service.ParseQuickAmount(text)
+		if err == nil && cur != "" && cur != d.currency {
+			err = model.Invalid("You chose " + strings.ToLower(currencyNames[d.currency]) + ". Type just the number.")
+		}
 		if err == nil {
-			if cur == "" || (cur != "USD" && cur != "KHR") {
-				cur = d.currency
-			}
-			_, err = service.ParseAmount(amount, cur)
+			_, err = service.ParseAmount(amount, d.currency)
 		}
 		if err != nil {
-			msg, kb := amountPrompt(d)
-			b.send(c, chatID, "🤔 "+err.Error()+"\n\n"+msg, &kb)
-			if d.group {
-				b.askReply(c, chatID, "↩️ Price:", "e.g. 4.5 or 8000")
-			}
+			b.askAmount(c, chatID, d, err.Error())
 			return true
 		}
-		d.amount, d.currency, d.step = amount, cur, stepCategory
+		d.amount, d.step = amount, stepCategory
 		b.setDraft(chatID, d)
 		cats, _ := b.svc.ListExpenseCategories(ctx)
-		msg, kb := categoryPrompt(d, cats)
-		b.send(c, chatID, msg, &kb)
+		b.askCategory(c, chatID, d, cats)
 	case stepCategory:
 		cats, _ := b.svc.ListExpenseCategories(ctx)
-		b.toNote(c, chatID, 0, d, service.MatchCategory(cats, text), cats)
+		b.toNote(c, chatID, d, service.MatchCategory(cats, text))
 	case stepNote:
 		b.finishFlow(ctx, c, chatID, 0, text)
 	}
 	return true
 }
 
-// toNote stores the category and asks for the description. editMsg > 0 turns the
-// category question into the description question; otherwise a new message is sent.
-func (b *Bot) toNote(c Client, chatID int64, editMsg int, d *draft, category string, cats []model.ExpenseCategory) {
+func (b *Bot) toNote(c Client, chatID int64, d *draft, category string) {
 	d.category, d.step = category, stepNote
 	b.setDraft(chatID, d)
-	msg, kb := notePrompt(d, cats)
-	if editMsg > 0 {
-		b.edit(c, chatID, editMsg, msg, &kb)
-	} else {
-		b.send(c, chatID, msg, &kb)
-	}
-	if d.group {
-		b.askReply(c, chatID, "↩️ Description (or /skip):", "Optional description")
+	b.askNote(c, chatID, d)
+}
+
+// skipStep answers /skip: no category, or no description.
+func (b *Bot) skipStep(ctx context.Context, c Client, chatID int64) {
+	d := b.getDraft(chatID)
+	switch {
+	case d == nil:
+		b.sendMain(c, chatID, "Nothing to skip. Tap Add expense to start.")
+	case d.step == stepCategory:
+		b.toNote(c, chatID, d, "")
+	case d.step == stepNote:
+		b.finishFlow(ctx, c, chatID, 0, "")
+	default:
+		b.send(c, chatID, "This question can't be skipped.", nil)
 	}
 }
 
@@ -288,7 +283,7 @@ func (b *Bot) finishFlow(ctx context.Context, c Client, chatID int64, editMsg in
 		var ve *model.ValidationError
 		if errors.As(err, &ve) {
 			b.setDraft(chatID, nil)
-			b.sendMain(c, chatID, "🤔 "+ve.Msg+"\nTap ➕ Add expense to try again.")
+			b.sendMain(c, chatID, ve.Msg+"\nTap Add expense to try again.")
 			return
 		}
 		slog.Error("telegram expense", "err", err)
@@ -298,7 +293,7 @@ func (b *Bot) finishFlow(ctx context.Context, c Client, chatID int64, editMsg in
 	b.setDraft(chatID, nil)
 	cats, _ := b.svc.ListExpenseCategories(ctx)
 	kb := expenseKeyboard(e, cats, false)
-	text := expenseText(b.svc, e, cats, "✅ Saved")
+	text := expenseText(b.svc, e, cats, "Saved")
 	if editMsg > 0 {
 		b.edit(c, chatID, editMsg, text, &kb)
 	} else {
@@ -317,7 +312,7 @@ func (b *Bot) handleFlowCallback(ctx context.Context, c Client, cq *tgbotapi.Cal
 	d := b.getDraft(chatID)
 	if d == nil {
 		answer("This entry has expired")
-		b.edit(c, chatID, msgID, "⌛ Expired. Tap ➕ Add expense to start again.", nil)
+		b.edit(c, chatID, msgID, "Expired. Tap Add expense to start again.", nil)
 		return
 	}
 	code := m[1]
@@ -325,17 +320,17 @@ func (b *Bot) handleFlowCallback(ctx context.Context, c Client, cq *tgbotapi.Cal
 	case code == "cancel":
 		b.setDraft(chatID, nil)
 		answer("Cancelled")
-		b.edit(c, chatID, msgID, "✖ Cancelled.", nil)
+		b.edit(c, chatID, msgID, "Cancelled.", nil)
 	case strings.HasPrefix(code, "cur:"):
-		if d.step != stepAmount {
+		if d.step != stepCurrency {
 			answer("Answer the question above first")
 			return
 		}
-		d.currency = strings.TrimPrefix(code, "cur:")
+		d.currency, d.step = strings.TrimPrefix(code, "cur:"), stepAmount
 		b.setDraft(chatID, d)
-		answer(map[string]string{"USD": "💵 Dollar", "KHR": "៛ Riel"}[d.currency])
-		msg, kb := amountPrompt(d)
-		b.edit(c, chatID, msgID, msg, &kb)
+		answer("")
+		b.edit(c, chatID, msgID, d.item+"\nCurrency: "+currencyNames[d.currency], nil)
+		b.askAmount(c, chatID, d, "")
 	case code == "nonote":
 		if d.step != stepNote {
 			answer("Answer the question above first")
@@ -347,22 +342,31 @@ func (b *Bot) handleFlowCallback(ctx context.Context, c Client, cq *tgbotapi.Cal
 		answer("Answer the question above first")
 	case code == "nocat":
 		answer("")
-		cats, _ := b.svc.ListExpenseCategories(ctx)
-		b.toNote(c, chatID, msgID, d, "", cats)
+		b.edit(c, chatID, msgID, d.item+" — "+priceText(d)+"\nCategory: none", nil)
+		b.toNote(c, chatID, d, "")
 	default:
 		id, _ := strconv.ParseInt(code[1:], 10, 64)
 		cats, _ := b.svc.ListExpenseCategories(ctx)
-		name := ""
-		for _, x := range cats {
-			if x.ID == id {
-				name = x.Name
+		var cat *model.ExpenseCategory
+		for i := range cats {
+			if cats[i].ID == id {
+				cat = &cats[i]
 			}
 		}
-		if name == "" {
+		if cat == nil {
 			answer("That category no longer exists")
 			return
 		}
 		answer("")
-		b.toNote(c, chatID, msgID, d, name, cats)
+		b.edit(c, chatID, msgID, d.item+" — "+priceText(d)+"\nCategory: "+categoryLabel(cats, cat.Name), nil)
+		b.toNote(c, chatID, d, cat.Name)
 	}
+}
+
+// currencyName is "Dollar" / "Riel", or the code for other currencies.
+func currencyName(code string) string {
+	if n, ok := currencyNames[code]; ok {
+		return n
+	}
+	return code
 }

@@ -68,53 +68,56 @@ The date and time of every expense are recorded automatically. Send `/start` onc
 the button bar under the text box:
 
 ```
-[        ➕ Add expense        ]
-[ 📊 Today ]      [ 📅 Month ]
+[        Add expense        ]
+[   Today   ] [ This month  ]
 ```
 
 ### Step by step
 
-Tap **➕ Add expense** (or send `/add`) and answer four questions:
+Tap **Add expense** (or send `/add`) and answer five short questions:
 
 ```
-You: (tap ➕ Add expense)
-Bot: 1/4 🧾 What did you spend on?                       [✖ Cancel]
-You: Lunch
-Bot: 2/4 💵 How much for Lunch?
-     Tap Dollar or Riel, then type the price (e.g. 4.5).
-     [✅ 💵 Dollar] [៛ Riel]
-You: (tap ៛ Riel if needed), then type 16000
-Bot: 3/4 🏷 Category for Lunch (16,000៛)?
+Bot: New expense (1/5)
+     What did you spend on?                       [Cancel]
+You: Dinner
+Bot: Dinner
+     Choose the currency (2/5):
+     [Dollar ($)] [Riel (៛)]
+You: (tap Riel)
+Bot: Enter the amount in riel (3/5):
+     Example: 16000
+You: 16000
+Bot: Dinner — 16,000៛
+     Choose a category (4/5):
      [🍜 Food & Drinks] [🛒 Groceries]
      [🛺 Transport]     [🛍️ Shopping]   …
-     [⏭ No category]    [✖ Cancel]
-You: (tap 🍜 Food & Drinks)
-Bot: 4/4 📝 Description? (optional)
-     Lunch · 16,000៛ · 🍜 Food & Drinks
-     [💾 Save without description]
-You: with the team        (or tap Save without description)
-Bot: ✅ Saved
-     🧾 Lunch — 16,000៛
-     🍜 Food & Drinks
-     🕒 Thu 29 Oct 12:30           [🏷 Category] [💱 Dollar] [🗑 Undo]
+     [No category] [Cancel]
+You: (tap Food & Drinks)
+Bot: Description (5/5), optional:
+     Type a note, or tap Save.
+     [Save without description] [Cancel]
+You: with family
+Bot: Saved
+     Dinner — 16,000៛
+     Category: 🍜 Food & Drinks
+     Description: with family
+     Fri 30 Oct, 20:30
+     [Change category] [Switch to Dollar] [Undo]
 ```
 
-- **Dollar or Riel**: the currency of your last expense is preselected (✅). Typing a mark
-  (`$4.50`, `8000r`) also works and wins over the buttons.
-- A wrong price is simply asked again. Typing a category name (e.g. `drinks`) works like tapping one;
-  a new name becomes a new category.
-- Nothing is saved until the last step.
-- `/skip` skips the category or the description. **✖ Cancel** or `/cancel` stops the entry.
-  An unfinished entry expires after 15 minutes.
-- **📊 Today** and **📅 Month** can be tapped at any time, also in the middle of an entry.
+- Riel amounts have no decimals; dollar amounts can have cents (`4.50`). A wrong amount is asked again.
+- Typing a category name (e.g. `drinks`) works like tapping one; a new name becomes a new category.
+- Nothing is saved until the last step. `/skip` skips the category or the description;
+  **Cancel** or `/cancel` stops the entry. An unfinished entry expires after 15 minutes.
+- **Today** and **This month** can be tapped at any time, also in the middle of an entry.
 
 ### Using the bot in a group
 
 If `TELEGRAM_CHAT_ID` is a **group** (commands then look like `/add@yourbot`), Telegram's
 *privacy mode* stops the bot from seeing normal messages: it only receives commands,
 button presses and **replies to its own messages**. The bot handles this: in a group,
-every question you answer by typing (what, price, description) opens a reply
-automatically (`↩️ Price:`), so just type and send.
+every question you answer by typing (what, amount, description) opens a reply
+automatically, so just type and send; use `/skip` and `/cancel` instead of those buttons.
 
 To let the bot read normal group messages too (needed for one-message expenses such as
 `lunch 4.5`), turn privacy mode off: **@BotFather → /setprivacy → your bot → Disable**,
@@ -164,10 +167,10 @@ Pick a category:
 
 | Command | Shows |
 |---|---|
-| `/add` | Start a step-by-step entry (same as ➕ Add expense) |
-| `/today` | Total spent today per currency, then per category (same as 📊 Today) |
+| `/add` | Start a step-by-step entry (same as Add expense) |
+| `/today` | Total spent today per currency, then per category (same as Today) |
 | `/week` | The same for this week (Monday to Sunday) |
-| `/month` | The same for this month (same as 📅 Month) |
+| `/month` | The same for this month (same as This month) |
 | `/cancel` | Stop a step-by-step entry |
 | `/help` | The examples above, and shows the button bar again |
 

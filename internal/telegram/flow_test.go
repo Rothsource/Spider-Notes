@@ -28,98 +28,110 @@ func TestGuidedExpenseEntry(t *testing.T) {
 		t.Fatal("help should show the main keyboard")
 	}
 
-	// 1 What → 2 price (Riel button, bad answer re-asked) → 3 category → 4 description.
+	// 1 what → 2 currency → 3 amount → 4 category → 5 description.
 	bot.HandleUpdate(ctx, ownerMsg(btnAdd))
 	if !strings.Contains(mc.lastSent().Text, "What did you spend on?") {
 		t.Fatalf("start: %q", mc.lastSent().Text)
 	}
-	bot.HandleUpdate(ctx, ownerMsg("Tuk tuk to market"))
+	bot.HandleUpdate(ctx, ownerMsg("Dinner"))
 	ask := mc.lastSent()
-	if !strings.Contains(ask.Text, "How much for Tuk tuk to market?") || !strings.Contains(ask.Text, "Dollar or Riel") {
-		t.Fatalf("price prompt: %q", ask.Text)
+	if !strings.Contains(ask.Text, "Choose the currency (2/5)") {
+		t.Fatalf("currency question: %q", ask.Text)
+	}
+	bot.HandleUpdate(ctx, ownerMsg("16000")) // typing before choosing
+	if !strings.Contains(mc.lastSent().Text, "tap Dollar or Riel") {
+		t.Fatalf("currency first: %q", mc.lastSent().Text)
 	}
 	bot.HandleUpdate(ctx, press(findButton(t, inline(t, ask), "Riel"), ownerChat, 5))
-	if ed := mc.lastEdit(); !strings.Contains(ed.Text, "e.g. 8000") || ed.ReplyMarkup.InlineKeyboard[0][1].Text != "✅ ៛ Riel" {
-		t.Fatalf("riel not selected: %+v", ed)
+	if ed := mc.lastEdit(); ed.MessageID != 5 || !strings.Contains(ed.Text, "Currency: Riel") || len(ed.ReplyMarkup.InlineKeyboard) != 0 {
+		t.Fatalf("currency chosen: %+v", ed)
 	}
-	bot.HandleUpdate(ctx, ownerMsg("cheap"))
-	if !strings.Contains(mc.lastSent().Text, "Send just the amount") {
-		t.Fatalf("bad amount: %q", mc.lastSent().Text)
+	if q := mc.lastSent().Text; !strings.Contains(q, "Enter the amount in riel (3/5)") {
+		t.Fatalf("amount question: %q", q)
 	}
-	bot.HandleUpdate(ctx, ownerMsg("8,000"))
+	bot.HandleUpdate(ctx, ownerMsg("16000.50"))
+	if !strings.Contains(mc.lastSent().Text, "no decimals") {
+		t.Fatalf("riel decimals: %q", mc.lastSent().Text)
+	}
+	bot.HandleUpdate(ctx, ownerMsg("$5"))
+	if !strings.Contains(mc.lastSent().Text, "You chose riel") {
+		t.Fatalf("other currency typed: %q", mc.lastSent().Text)
+	}
+	bot.HandleUpdate(ctx, ownerMsg("16,000"))
 	ask = mc.lastSent()
-	if !strings.Contains(ask.Text, "Category for Tuk tuk to market (8,000៛)") {
-		t.Fatalf("category prompt: %q", ask.Text)
+	if !strings.Contains(ask.Text, "Dinner — 16,000៛") || !strings.Contains(ask.Text, "Choose a category (4/5)") {
+		t.Fatalf("category question: %q", ask.Text)
 	}
-	bot.HandleUpdate(ctx, press(findButton(t, inline(t, ask), "Transport"), ownerChat, 20))
-	if ed := mc.lastEdit(); ed.MessageID != 20 || !strings.Contains(ed.Text, "Description? (optional)") || !strings.Contains(ed.Text, "🛺 Transport") {
-		t.Fatalf("description prompt: %q", ed.Text)
+	bot.HandleUpdate(ctx, press(findButton(t, inline(t, ask), "Food & Drinks"), ownerChat, 20))
+	if ed := mc.lastEdit(); ed.MessageID != 20 || !strings.Contains(ed.Text, "Category: 🍜 Food & Drinks") {
+		t.Fatalf("category chosen: %q", ed.Text)
+	}
+	if q := mc.lastSent().Text; !strings.Contains(q, "Description (5/5)") {
+		t.Fatalf("description question: %q", q)
 	}
 	if list, _ := svc.ListExpenses(ctx, model.ExpenseFilter{}); len(list) != 0 {
-		t.Fatal("must not save before the description step")
+		t.Fatal("must not save before the last step")
 	}
-	bot.HandleUpdate(ctx, ownerMsg("shared with Dara"))
+	bot.HandleUpdate(ctx, ownerMsg("with family"))
 	list, _ := svc.ListExpenses(ctx, model.ExpenseFilter{})
-	if len(list) != 1 || list[0].Item != "Tuk tuk to market" || list[0].AmountMinor != 8000 || list[0].Currency != "KHR" ||
-		list[0].Category != "Transport" || list[0].Note != "shared with Dara" {
+	if len(list) != 1 || list[0].Item != "Dinner" || list[0].AmountMinor != 16000 || list[0].Currency != "KHR" ||
+		list[0].Category != "Food & Drinks" || list[0].Note != "with family" {
 		t.Fatalf("saved %+v", list)
 	}
-	if !strings.Contains(mc.lastSent().Text, "✅ Saved") {
-		t.Fatalf("confirmation %q", mc.lastSent().Text)
+	if txt := mc.lastSent().Text; !strings.HasPrefix(txt, "Saved\nDinner — 16,000៛") || !strings.Contains(txt, "Description: with family") {
+		t.Fatalf("confirmation %q", txt)
 	}
 
-	// Dollar is preselected from the last expense only when it was dollars: here riel stays.
+	// Dollar, typed category, save without description.
 	bot.HandleUpdate(ctx, ownerMsg(btnAdd))
 	bot.HandleUpdate(ctx, ownerMsg("Iced coffee"))
-	if !strings.Contains(mc.lastSent().Text, "e.g. 8000") {
-		t.Fatalf("last currency (riel) should be preselected: %q", mc.lastSent().Text)
-	}
-	bot.HandleUpdate(ctx, ownerMsg("$1.25"))  // a typed mark overrides the button
-	bot.HandleUpdate(ctx, ownerMsg("drinks")) // typed category
-	desc := mc.lastSent()
-	bot.HandleUpdate(ctx, press(findButton(t, inline(t, desc), "Save without description"), ownerChat, 21))
+	bot.HandleUpdate(ctx, press("a:cur:USD", ownerChat, 6))
+	bot.HandleUpdate(ctx, ownerMsg("1.25"))
+	bot.HandleUpdate(ctx, ownerMsg("drinks"))
+	bot.HandleUpdate(ctx, press(findButton(t, inline(t, mc.lastSent()), "Save without description"), ownerChat, 21))
 	list, _ = svc.ListExpenses(ctx, model.ExpenseFilter{})
 	if list[0].Item != "Iced coffee" || list[0].Currency != "USD" || list[0].AmountMinor != 125 || list[0].Category != "Food & Drinks" || list[0].Note != "" {
 		t.Fatalf("second %+v", list[0])
 	}
-	if ed := mc.lastEdit(); ed.MessageID != 21 || !strings.Contains(ed.Text, "✅ Saved") {
+	if ed := mc.lastEdit(); ed.MessageID != 21 || !strings.HasPrefix(ed.Text, "Saved") {
 		t.Fatalf("save without description: %q", ed.Text)
 	}
 
-	// No category.
-	bot.HandleUpdate(ctx, ownerMsg(btnAdd))
+	// No category; old keyboard texts still work.
+	bot.HandleUpdate(ctx, ownerMsg("➕ Add expense"))
 	bot.HandleUpdate(ctx, ownerMsg("Gift"))
+	bot.HandleUpdate(ctx, press("a:cur:USD", ownerChat, 7))
 	bot.HandleUpdate(ctx, ownerMsg("20"))
 	bot.HandleUpdate(ctx, press("a:nocat", ownerChat, 30))
-	bot.HandleUpdate(ctx, press("a:nonote", ownerChat, 30))
+	bot.HandleUpdate(ctx, press("a:nonote", ownerChat, 31))
 	list, _ = svc.ListExpenses(ctx, model.ExpenseFilter{})
-	if list[0].Item != "Gift" || list[0].Category != "" || list[0].AmountMinor != 2000 || list[0].Currency != "USD" {
+	if list[0].Item != "Gift" || list[0].Category != "" || list[0].AmountMinor != 2000 {
 		t.Fatalf("no category %+v", list[0])
 	}
 
 	// Buttons out of order, tampering, cancel, expiry.
 	bot.HandleUpdate(ctx, ownerMsg(btnAdd))
 	for _, data := range []string{"a:nocat", "a:nonote", "a:cur:KHR"} {
-		bot.HandleUpdate(ctx, press(data, ownerChat, 31))
+		bot.HandleUpdate(ctx, press(data, ownerChat, 32))
 		if mc.lastAnswer() != "Answer the question above first" {
 			t.Fatalf("%s early: %q", data, mc.lastAnswer())
 		}
 	}
 	for _, data := range []string{"a:c1x", "a:cur:EUR"} {
-		bot.HandleUpdate(ctx, press(data, ownerChat, 31))
+		bot.HandleUpdate(ctx, press(data, ownerChat, 32))
 		if mc.lastAnswer() != "Unknown action" {
 			t.Fatalf("%s tampered: %q", data, mc.lastAnswer())
 		}
 	}
-	bot.HandleUpdate(ctx, press("a:cancel", 777, 31)) // a stranger cannot touch the entry
+	bot.HandleUpdate(ctx, press("a:cancel", 777, 32)) // a stranger cannot touch the entry
 	if bot.getDraft(ownerChat) == nil {
 		t.Fatal("stranger cancelled the owner's entry")
 	}
-	bot.HandleUpdate(ctx, press("a:cancel", ownerChat, 31))
+	bot.HandleUpdate(ctx, press("a:cancel", ownerChat, 32))
 	if mc.lastAnswer() != "Cancelled" || bot.getDraft(ownerChat) != nil {
 		t.Fatal("cancel should clear the entry")
 	}
-	bot.HandleUpdate(ctx, press("a:nonote", ownerChat, 31))
+	bot.HandleUpdate(ctx, press("a:nonote", ownerChat, 32))
 	if mc.lastAnswer() != "This entry has expired" {
 		t.Fatalf("stale button: %q", mc.lastAnswer())
 	}
@@ -133,8 +145,8 @@ func TestGuidedExpenseEntry(t *testing.T) {
 	}
 
 	bot.HandleUpdate(ctx, ownerMsg(btnToday))
-	if msg := mc.lastSent(); !strings.Contains(msg.Text, "Today") {
-		t.Fatalf("today button: %q", msg.Text)
+	if txt := mc.lastSent().Text; !strings.HasPrefix(txt, "Today (") || !strings.Contains(txt, "Total: ") {
+		t.Fatalf("today button: %q", txt)
 	}
 }
 
@@ -148,16 +160,17 @@ func TestGuidedEntryInGroup(t *testing.T) {
 	isForceReply := func(m tgbotapi.MessageConfig) bool { _, ok := m.ReplyMarkup.(tgbotapi.ForceReply); return ok }
 
 	bot.HandleUpdate(ctx, group("/add@spideryou_bot"))
-	if q := mc.lastSent(); !strings.Contains(q.Text, "1/4") || !isForceReply(q) {
+	if q := mc.lastSent(); !strings.Contains(q.Text, "What did you spend on?") || !isForceReply(q) {
 		t.Fatalf("item question should open a reply: %+v", q)
 	}
 	bot.HandleUpdate(ctx, group("Dinner"))
-	if q := mc.lastSent(); q.Text != "↩️ Price:" || !isForceReply(q) {
-		t.Fatalf("price should open a reply: %+v", q)
+	bot.HandleUpdate(ctx, press("a:cur:KHR", ownerChat, 3))
+	if q := mc.lastSent(); !strings.Contains(q.Text, "Enter the amount in riel") || !isForceReply(q) {
+		t.Fatalf("amount should open a reply: %+v", q)
 	}
-	bot.HandleUpdate(ctx, group("16000r"))
+	bot.HandleUpdate(ctx, group("16000"))
 	bot.HandleUpdate(ctx, group("/skip@spideryou_bot")) // no category
-	if q := mc.lastSent(); !strings.Contains(q.Text, "Description") || !isForceReply(q) {
+	if q := mc.lastSent(); !strings.Contains(q.Text, "/skip") || !isForceReply(q) {
 		t.Fatalf("description should open a reply: %+v", q)
 	}
 	bot.HandleUpdate(ctx, group("/skip")) // no description
